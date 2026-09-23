@@ -1,4 +1,79 @@
 @import "tailwindcss";
+
+.dream-field {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 6;
+  min-height: 390px;
+  border: 1px solid #bbf7d04d;
+  border-radius: 16px;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    0deg,
+    #2d711c 0%,
+    #2d711c 10%,
+    #378622 10%,
+    #378622 20%
+  );
+  box-shadow: inset 0 0 60px #06230d80;
+}
+.dream-position {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 28%;
+  max-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 12px;
+}
+.dream-drop-target {
+  background: #fcd34d40;
+  outline: 2px dashed #fcd34d;
+  outline-offset: 4px;
+}
+.dream-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  border-radius: 10px;
+  padding: 2px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dream-shirt {
+  width: clamp(48px, 8vw, 76px);
+  height: auto;
+  flex-shrink: 0;
+  filter: drop-shadow(0 3px 2px #0005);
+}
+.dream-player-name {
+  max-width: 100%;
+  margin-top: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #08250ddd;
+  color: white;
+  font-size: clamp(10px, 1.4vw, 12px);
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.dream-remove {
+  position: absolute;
+  top: 12px;
+  right: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #092219e8;
+  color: white;
+  font-size: 20px;
+}
 :root {
   color-scheme: dark;
 }

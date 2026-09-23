@@ -1,9 +1,12 @@
+import type { DreamTeam } from "./dream-team";
+
 export type Member = {
   id: string;
   name: string;
   jerseyNumber?: number;
   slots: number[];
   updatedAt: string | null;
+  dreamTeam?: DreamTeam;
 };
 export type Team = {
   slug: string;

@@ -10,6 +10,7 @@ import {
 import { Shell } from "./shell";
 import { days, sessions, rankSlots, memberLabel, type Team } from "@/lib/team";
 import { TopSlotsChart } from "./top-slots-chart";
+import { DreamTeamSection } from "./dream-team";
 export function TeamBoard({ slug }: { slug: string }) {
   const [team, setTeam] = useState<Team | null>(null);
   const [mode, setMode] = useState("");
@@ -19,9 +20,6 @@ export function TeamBoard({ slug }: { slug: string }) {
   const [name, setName] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [shortNameConfirmed, setShortNameConfirmed] = useState(false);
-  const [nameSuggestionChoice, setNameSuggestionChoice] = useState<
-    "nickname" | "original" | null
-  >(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -134,7 +132,6 @@ export function TeamBoard({ slug }: { slug: string }) {
       setName("");
       setJerseyNumber("");
       setShortNameConfirmed(false);
-      setNameSuggestionChoice(null);
     }
   }
   async function save() {
@@ -185,18 +182,7 @@ export function TeamBoard({ slug }: { slug: string }) {
   const nameWordCount = name.trim().split(/\s+/).filter(Boolean).length;
   const isOneWordName = nameWordCount === 1;
   const isTwoWordName = nameWordCount === 2;
-  const normalizedName = name
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("vi");
-  const isSuggestedTruongName =
-    jerseyNumber === "8" &&
-    (normalizedName === "nguyễn công trường" ||
-      normalizedName === "công trường");
-  const showNameSuggestion =
-    isSuggestedTruongName && nameSuggestionChoice === null;
-  const needsShortNameConfirmation =
-    isTwoWordName && !shortNameConfirmed && !showNameSuggestion;
+  const needsShortNameConfirmation = isTwoWordName && !shortNameConfirmed;
   return (
     <Shell>
       <div className="flex flex-wrap items-start justify-between gap-5">
@@ -283,7 +269,6 @@ export function TeamBoard({ slug }: { slug: string }) {
                   onChange={(e) => {
                     setName(e.target.value);
                     setShortNameConfirmed(false);
-                    setNameSuggestionChoice(null);
                   }}
                 />
               </div>
@@ -302,10 +287,7 @@ export function TeamBoard({ slug }: { slug: string }) {
                   required
                   placeholder="0–99"
                   value={jerseyNumber}
-                  onChange={(e) => {
-                    setJerseyNumber(e.target.value);
-                    setNameSuggestionChoice(null);
-                  }}
+                  onChange={(e) => setJerseyNumber(e.target.value)}
                 />
               </div>
               <button
@@ -314,51 +296,19 @@ export function TeamBoard({ slug }: { slug: string }) {
                   !name.trim() ||
                   !jerseyNumber.trim() ||
                   isOneWordName ||
-                  needsShortNameConfirmation ||
-                  showNameSuggestion
+                  needsShortNameConfirmation
                 }
                 className="primary col-span-2 sm:col-span-1"
               >
                 + Thêm
               </button>
             </form>
-            {showNameSuggestion && (
-              <div
-                className="mt-3 rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100"
-                role="alert"
-              >
-                <p>Bạn có muốn đặt tên là Trường con Bắc Ninh không?</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="secondary border-amber-200/30 text-amber-50"
-                    onClick={() => {
-                      setName("Trường con Bắc Ninh");
-                      setNameSuggestionChoice("nickname");
-                      setShortNameConfirmed(false);
-                    }}
-                  >
-                    Chắc chắn rồi
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary border-amber-200/30 text-amber-50"
-                    onClick={() => {
-                      setNameSuggestionChoice("original");
-                      if (isTwoWordName) setShortNameConfirmed(true);
-                    }}
-                  >
-                    Có
-                  </button>
-                </div>
-              </div>
-            )}
             {isOneWordName && (
               <div
                 className="mt-3 rounded-xl border border-red-300/30 bg-red-300/10 p-4 text-sm text-red-100"
                 role="alert"
               >
-                Nhập đủ họ tên đi con vợ ơi!
+                Vui lòng nhập đầy đủ họ và tên nhé.
               </div>
             )}
             {needsShortNameConfirmation && (
@@ -366,15 +316,17 @@ export function TeamBoard({ slug }: { slug: string }) {
                 className="mt-3 rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100"
                 role="alert"
               >
-                <p>Tên ông bạn chỉ có 2 từ thôi à?</p>
-                <p className="mt-2">Ông bạn muốn tiếp tục với tên này không?</p>
+                <p>Tên này có vẻ hơi ngắn.</p>
+                <p className="mt-2">
+                  Bạn có muốn tiếp tục sử dụng tên này không?
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     className="secondary border-amber-200/30 text-amber-50"
                     onClick={() => setShortNameConfirmed(true)}
                   >
-                    Có
+                    Tiếp tục
                   </button>
                   <button
                     type="button"
@@ -385,7 +337,7 @@ export function TeamBoard({ slug }: { slug: string }) {
                       nameInputRef.current?.focus();
                     }}
                   >
-                    Để tôi viết lại
+                    Nhập lại
                   </button>
                 </div>
               </div>
@@ -574,10 +526,10 @@ export function TeamBoard({ slug }: { slug: string }) {
         <aside className="panel min-w-0 p-5 sm:p-6 lg:sticky lg:top-6">
           <span className="eyebrow">GIỜ ĐẸP RA SÂN ↗</span>
           <h2 className="mt-3 text-2xl font-extrabold">Top 5 khung giờ</h2>
-          <p className="mt-2 text-xs leading-5 text-emerald-100/50">
+          {/* <p className="mt-2 text-xs leading-5 text-emerald-100/50">
             Ưu tiên ít người vắng nhất. Bằng điểm thì xếp theo thứ và buổi trong
             tuần.
-          </p>
+          </p> */}
           {team.members.length > 0 && submitted > 0 && (
             <TopSlotsChart ranks={ranks} memberCount={team.members.length} />
           )}
@@ -667,6 +619,7 @@ export function TeamBoard({ slug }: { slug: string }) {
           </div>
         </aside>
       </div>
+      <DreamTeamSection team={team} busy={busy} onSave={mutate} />
       <p className="mt-7 text-xs leading-5 text-emerald-100/40">
         Ai có link đều có thể chỉnh sửa. Lịch hết hạn ngày{" "}
         {new Date(team.expiresAt).toLocaleDateString("vi-VN")}.
