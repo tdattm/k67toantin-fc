@@ -12,8 +12,8 @@ export type PopularDreamTeam = {
 
 export const formations: Record<FormationId, Position[]> = {
   "3-1-2": [
-    { id: "ST_L", label: "ST trái", x: 30, y: 17 },
-    { id: "ST_R", label: "ST phải", x: 70, y: 17 },
+    { id: "LW", label: "LW", x: 30, y: 17 },
+    { id: "RW", label: "RW", x: 70, y: 17 },
     { id: "CM", label: "CM", x: 50, y: 41 },
     { id: "LB", label: "LB", x: 20, y: 63 },
     { id: "CB", label: "CB", x: 50, y: 65 },

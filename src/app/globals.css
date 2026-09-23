@@ -3,8 +3,10 @@
 .dream-field {
   position: relative;
   width: 100%;
+  max-width: 540px;
   aspect-ratio: 5 / 6;
-  min-height: 390px;
+  height: auto;
+  margin-inline: auto;
   border: 1px solid #bbf7d04d;
   border-radius: 16px;
   overflow: hidden;
