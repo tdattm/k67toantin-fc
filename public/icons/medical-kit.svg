@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>Túi cứu thương</title>
+  <rect x="12" y="116" width="488" height="384" rx="72" fill="#f05252"/>
+  <rect x="164" y="36" width="184" height="112" rx="32" fill="none" stroke="#607d8b" stroke-width="32"/>
+  <rect x="76" y="100" width="96" height="36" rx="4" fill="#607d8b"/>
+  <rect x="340" y="100" width="96" height="36" rx="4" fill="#607d8b"/>
+  <circle cx="256" cy="300" r="132" fill="#e1e1e1"/>
+  <path d="M228 212h56v60h60v56h-60v60h-56v-60h-60v-56h60z" fill="#f05252"/>
+</svg>

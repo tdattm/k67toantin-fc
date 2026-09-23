@@ -1,8 +1,11 @@
 export type FormationId = "3-1-2" | "2-3-1";
+export type SupportRole = "medical" | "water" | "superSub";
+export const MAX_SUPPORT_PLAYERS = 4;
 export type Position = { id: string; label: string; x: number; y: number };
 export type DreamTeam = {
   formation: FormationId;
   players: Record<string, string>;
+  support?: Partial<Record<SupportRole, string[]>>;
   updatedAt: string;
 };
 export type PopularDreamTeam = {
@@ -30,9 +33,41 @@ export const formations: Record<FormationId, Position[]> = {
     { id: "GK", label: "GK", x: 50, y: 87 },
   ],
 };
+export const supportRoles: Array<{
+  id: SupportRole;
+  label: string;
+  shortLabel: string;
+}> = [
+  { id: "medical", label: "Y tế", shortLabel: "Y tế" },
+  { id: "water", label: "Xách nước", shortLabel: "Xách nước" },
+  { id: "superSub", label: "Siêu dự bị", shortLabel: "SIêu dự bị" },
+];
 
 export function isFormation(value: unknown): value is FormationId {
   return value === "3-1-2" || value === "2-3-1";
+}
+
+/** Normalize old one-player support assignments and cap each sideline area. */
+export function normalizeSupport(
+  support: unknown,
+): Partial<Record<SupportRole, string[]>> {
+  if (!support || typeof support !== "object" || Array.isArray(support))
+    return {};
+  const source = support as Record<string, unknown>;
+  const normalized: Partial<Record<SupportRole, string[]>> = {};
+  for (const role of supportRoles) {
+    const value = source[role.id];
+    const values = Array.isArray(value)
+      ? value
+      : typeof value === "string"
+        ? [value]
+        : [];
+    const ids = values
+      .filter((id): id is string => typeof id === "string")
+      .slice(0, MAX_SUPPORT_PLAYERS);
+    if (ids.length) normalized[role.id] = ids;
+  }
+  return normalized;
 }
 
 export function popularDreamTeam(
@@ -77,10 +112,32 @@ export function popularDreamTeam(
       used.add(winner);
     }
   }
+  const support: Partial<Record<SupportRole, string[]>> = {};
+  for (const role of supportRoles) {
+    const votes = new Map<string, number>();
+    for (const dreamTeam of saved) {
+      if (dreamTeam.formation !== formation) continue;
+      for (const memberId of normalizeSupport(dreamTeam.support)[role.id] ?? [])
+        votes.set(memberId, (votes.get(memberId) ?? 0) + 1);
+    }
+    const winners = [...votes.entries()]
+      .filter(([memberId]) => !used.has(memberId))
+      .sort(
+        ([idA, countA], [idB, countB]) =>
+          countB - countA || idA.localeCompare(idB),
+      )
+      .slice(0, MAX_SUPPORT_PLAYERS)
+      .map(([memberId]) => memberId);
+    if (winners.length) {
+      support[role.id] = winners;
+      for (const memberId of winners) used.add(memberId);
+    }
+  }
   return {
     dreamTeam: {
       formation,
       players,
+      support,
       updatedAt: new Date().toISOString(),
     },
     votes: formationVotes.get(formation) ?? 0,

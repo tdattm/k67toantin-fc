@@ -3,15 +3,24 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import {
   formations,
+  MAX_SUPPORT_PLAYERS,
+  normalizeSupport,
   placePlayer,
   popularDreamTeam,
+  supportRoles,
   type DreamTeam,
   type FormationId,
+  type SupportRole,
 } from "@/lib/dream-team";
 import { memberLabel, type Member, type Team } from "@/lib/team";
 
 type Save = (body: object, message: string) => Promise<boolean>;
-type Draft = { formation: FormationId; players: Record<string, string> };
+type Draft = {
+  formation: FormationId;
+  players: Record<string, string>;
+  support?: Partial<Record<SupportRole, string[]>>;
+};
+type DropTarget = { kind: "position" | "support"; id: string };
 
 function Shirt({
   number,
@@ -50,6 +59,94 @@ function Shirt({
         {empty ? "+" : (number ?? "–")}
       </text>
     </svg>
+  );
+}
+
+function SupportIcon({ role }: { role: SupportRole }) {
+  const icon =
+    role === "medical"
+      ? "/icons/medical-kit.svg"
+      : role === "water"
+        ? "/icons/water-bucket.svg"
+        : "/icons/tire.svg";
+  return <img src={icon} alt="" aria-hidden="true" className="dream-support-icon" />;
+}
+
+function SupportRail({
+  support,
+  members,
+  picked,
+  hovered,
+  busy,
+  preview = false,
+  onClick,
+  onRemove,
+}: {
+  support: Partial<Record<SupportRole, string[]>>;
+  members: Member[];
+  picked?: string;
+  hovered?: string;
+  busy?: boolean;
+  preview?: boolean;
+  onClick?: (role: SupportRole, index: number, currentId?: string) => void;
+  onRemove?: (role: SupportRole, index: number) => void;
+}) {
+  return (
+    <aside className="dream-support-rail" aria-label="Vị trí hỗ trợ bên sân">
+      {supportRoles.map((role) => {
+        const assigned = support[role.id] ?? [];
+        return (
+          <section
+            key={role.id}
+            className="dream-support-zone"
+          >
+            <div className="dream-support-zone-heading">
+              <SupportIcon role={role.id} />
+              <span>{role.label}</span>
+            </div>
+            <div className="dream-support-slots">
+              {Array.from({ length: MAX_SUPPORT_PLAYERS }, (_, index) => {
+                const member = members.find((m) => m.id === assigned[index]);
+                const targetId = `support:${role.id}:${index}`;
+                return (
+                  <div
+                    key={targetId}
+                    data-dream-support={`${role.id}:${index}`}
+                    className={`dream-support-slot ${hovered === targetId ? "dream-drop-target" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      disabled={busy || preview}
+                      className={`dream-support-button ${picked && picked === member?.id ? "ring-2 ring-amber-300" : ""}`}
+                      aria-label={`${role.label}, vị trí ${index + 1}: ${member ? memberLabel(member) : "Trống"}`}
+                      onClick={() => onClick?.(role.id, index, member?.id)}
+                    >
+                      <span className={`dream-support-player-circle ${member ? "" : "dream-support-empty"}`}>
+                        {member?.jerseyNumber ?? ""}
+                      </span>
+                      <span className="dream-support-player">
+                        {member?.name ?? ""}
+                      </span>
+                    </button>
+                    {member && onRemove && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="dream-support-remove"
+                        aria-label={`Bỏ ${memberLabel(member)} khỏi ${role.label}`}
+                        onClick={() => onRemove(role.id, index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </aside>
   );
 }
 
@@ -178,47 +275,54 @@ function PopularDreamTeamPreview({
           {Object.keys(dreamTeam.players).length}/{positions.length} vị trí
         </span>
       </div>
-      <div
-        className="dream-field mt-5"
-        aria-label={`Đội hình được chọn nhiều nhất, sơ đồ ${dreamTeam.formation}`}
-      >
-        <svg
-          viewBox="0 0 600 720"
-          preserveAspectRatio="none"
-          className="pointer-events-none absolute inset-0 size-full"
-          aria-hidden="true"
+      <div className="dream-board-with-support mt-5">
+        <div
+          className="dream-field"
+          aria-label={`Đội hình được chọn nhiều nhất, sơ đồ ${dreamTeam.formation}`}
         >
-          <g stroke="#efffe8" strokeOpacity=".6" strokeWidth="2" fill="none">
-            <rect x="22" y="22" width="556" height="676" rx="3" />
-            <path d="M22 360H578" />
-            <circle cx="300" cy="360" r="70" />
-            <circle cx="300" cy="360" r="3" fill="#efffe8" />
-            <path d="M165 22V133H435V22M165 698V587H435V698M235 22V65H365V22M235 698V655H365V698M263 22V8H337V22M263 698V712H337V698M247 133Q300 190 353 133M247 587Q300 530 353 587" />
-            <path d="M22 42Q42 42 42 22M558 22Q558 42 578 42M22 678Q42 678 42 698M558 698Q558 678 578 678" />
-          </g>
-        </svg>
-        {positions.map((position) => {
-          const player = members.find(
-            (member) => member.id === dreamTeam.players[position.id],
-          );
-          return (
-            <div
-              key={position.id}
-              className="dream-position"
-              style={{ left: `${position.x}%`, top: `${position.y}%` }}
-            >
-              <span className="mb-1 rounded bg-black/30 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white/90">
-                {position.label}
-              </span>
-              <div className="dream-player">
-                <Shirt number={player?.jerseyNumber} empty={!player} />
-                <span className="dream-player-name">
-                  {player?.name ?? "Chưa có lựa chọn"}
+          <svg
+            viewBox="0 0 600 720"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 size-full"
+            aria-hidden="true"
+          >
+            <g stroke="#efffe8" strokeOpacity=".6" strokeWidth="2" fill="none">
+              <rect x="22" y="22" width="556" height="676" rx="3" />
+              <path d="M22 360H578" />
+              <circle cx="300" cy="360" r="70" />
+              <circle cx="300" cy="360" r="3" fill="#efffe8" />
+              <path d="M165 22V133H435V22M165 698V587H435V698M235 22V65H365V22M235 698V655H365V698M263 22V8H337V22M263 698V712H337V698M247 133Q300 190 353 133M247 587Q300 530 353 587" />
+              <path d="M22 42Q42 42 42 22M558 22Q558 42 578 42M22 678Q42 678 42 698M558 698Q558 678 578 678" />
+            </g>
+          </svg>
+          {positions.map((position) => {
+            const player = members.find(
+              (member) => member.id === dreamTeam.players[position.id],
+            );
+            return (
+              <div
+                key={position.id}
+                className="dream-position"
+                style={{ left: `${position.x}%`, top: `${position.y}%` }}
+              >
+                <span className="mb-1 rounded bg-black/30 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white/90">
+                  {position.label}
                 </span>
+                <div className="dream-player">
+                  <Shirt number={player?.jerseyNumber} empty={!player} />
+                  <span className="dream-player-name">
+                    {player?.name ?? "Chưa có lựa chọn"}
+                  </span>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <SupportRail
+          support={normalizeSupport(dreamTeam.support)}
+          members={members}
+          preview
+        />
       </div>
       <p className="mt-3 text-xs text-emerald-100/50">
         Đây là đội hình tổng hợp. Chọn tên thành viên ở trên để xem hoặc chỉnh
@@ -269,6 +373,14 @@ function DreamTeamEditor({
         members.some((m) => m.id === id),
     ),
   );
+  const support = Object.fromEntries(
+    Object.entries(normalizeSupport(current.support))
+      .map(([role, ids]) => [
+        role,
+        ids.filter((id) => members.some((m) => m.id === id)),
+      ])
+      .filter(([, ids]) => ids.length),
+  ) as Partial<Record<SupportRole, string[]>>;
   const dirty = draft !== null;
   useEffect(() => {
     onDirty(dirty);
@@ -285,15 +397,43 @@ function DreamTeamEditor({
     setDraft(next);
     setFeedback("");
   }
-  function assign(position: string, id: string) {
+  function assign(target: DropTarget, id: string) {
     if (busy || !members.some((m) => m.id === id)) return;
-    change({
-      formation: current.formation,
-      players: placePlayer(players, position, id),
-    });
+    const nextPlayers = { ...players };
+    const nextSupport = normalizeSupport(support);
+    for (const role of supportRoles) {
+      const ids = (nextSupport[role.id] ?? []).filter((memberId) => memberId !== id);
+      if (ids.length) nextSupport[role.id] = ids;
+      else delete nextSupport[role.id];
+    }
+    for (const [position, memberId] of Object.entries(nextPlayers))
+      if (memberId === id && target.kind === "support")
+        delete nextPlayers[position];
+    if (target.kind === "position") {
+      change({
+        formation: current.formation,
+        players: placePlayer(nextPlayers, target.id, id),
+        support: nextSupport,
+      });
+    } else {
+      const [role, indexValue] = target.id.split(":");
+      const index = Number(indexValue);
+      const ids = [...(nextSupport[role as SupportRole] ?? [])];
+      ids[index] = id;
+      nextSupport[role as SupportRole] = ids.slice(0, MAX_SUPPORT_PLAYERS);
+      change({
+        formation: current.formation,
+        players: nextPlayers,
+        support: nextSupport,
+      });
+    }
     setPicked("");
+    const targetLabel =
+      target.kind === "position"
+        ? positions.find((p) => p.id === target.id)?.label
+        : supportRoles.find((role) => role.id === target.id.split(":")[0])?.label;
     setFeedback(
-      `Đã xếp ${memberLabel(members.find((m) => m.id === id)!)} vào ${positions.find((p) => p.id === position)?.label}. Nhớ lưu đội hình nhé.`,
+      `Đã xếp ${memberLabel(members.find((m) => m.id === id)!)} vào ${targetLabel}. Nhớ lưu đội hình nhé.`,
     );
   }
   function pointerDown(event: PointerEvent<HTMLButtonElement>, id: string) {
@@ -314,13 +454,17 @@ function DreamTeamEditor({
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
-  function positionAt(x: number, y: number) {
+  function positionAt(x: number, y: number): DropTarget | null {
     const target = document
       .elementFromPoint(x, y)
-      ?.closest<HTMLElement>("[data-dream-position]");
-    return target && fieldRef.current?.contains(target)
-      ? (target.dataset.dreamPosition ?? "")
-      : "";
+      ?.closest<HTMLElement>("[data-dream-position], [data-dream-support]");
+    if (!target || !fieldRef.current?.parentElement?.contains(target))
+      return null;
+    if (target.dataset.dreamPosition)
+      return { kind: "position", id: target.dataset.dreamPosition };
+    if (target.dataset.dreamSupport)
+      return { kind: "support", id: target.dataset.dreamSupport };
+    return null;
   }
   function pointerMove(event: PointerEvent<HTMLButtonElement>) {
     const active = gesture.current;
@@ -329,7 +473,8 @@ function DreamTeamEditor({
       active.dragging = true;
     if (active.dragging) {
       setGhost({ id: active.id, x: event.clientX, y: event.clientY });
-      setHovered(positionAt(event.clientX, event.clientY));
+      const target = positionAt(event.clientX, event.clientY);
+      setHovered(target ? `${target.kind}:${target.id}` : "");
     }
   }
   function pointerUp(event: PointerEvent<HTMLButtonElement>) {
@@ -337,8 +482,8 @@ function DreamTeamEditor({
     if (!active || active.pointerId !== event.pointerId) return;
     if (active.dragging) {
       suppressClick.current = true;
-      const position = positionAt(event.clientX, event.clientY);
-      if (position) assign(position, active.id);
+      const target = positionAt(event.clientX, event.clientY);
+      if (target) assign(target, active.id);
     }
     gesture.current = null;
     setGhost(null);
@@ -380,6 +525,7 @@ function DreamTeamEditor({
                     formations[formation].some((p) => p.id === position),
                   ),
                 ),
+                support,
               });
               setPicked("");
               setFeedback(
@@ -404,87 +550,122 @@ function DreamTeamEditor({
         hình.
       </p>
       <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div
-          ref={fieldRef}
-          className="dream-field order-2 lg:order-1"
-          aria-label={`Sân bóng sơ đồ ${current.formation}`}
-        >
-          <svg
-            viewBox="0 0 600 720"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 size-full"
-            aria-hidden="true"
+        <div className="dream-board-with-support order-2 lg:order-1">
+          <div
+            ref={fieldRef}
+            className="dream-field"
+            aria-label={`Sân bóng sơ đồ ${current.formation}`}
           >
-            <g stroke="#efffe8" strokeOpacity=".6" strokeWidth="2" fill="none">
-              <rect x="22" y="22" width="556" height="676" rx="3" />
-              <path d="M22 360H578" />
-              <circle cx="300" cy="360" r="70" />
-              <circle cx="300" cy="360" r="3" fill="#efffe8" />
-              <path d="M165 22V133H435V22M165 698V587H435V698M235 22V65H365V22M235 698V655H365V698M263 22V8H337V22M263 698V712H337V698M247 133Q300 190 353 133M247 587Q300 530 353 587" />
-              <path d="M22 42Q42 42 42 22M558 22Q558 42 578 42M22 678Q42 678 42 698M558 698Q558 678 578 678" />
-            </g>
-          </svg>
-          {positions.map((position) => {
-            const player = members.find((m) => m.id === players[position.id]);
-            return (
-              <div
-                key={position.id}
-                data-dream-position={position.id}
-                className={`dream-position ${hovered === position.id ? "dream-drop-target" : ""}`}
-                style={{ left: `${position.x}%`, top: `${position.y}%` }}
+            <svg
+              viewBox="0 0 600 720"
+              preserveAspectRatio="none"
+              className="pointer-events-none absolute inset-0 size-full"
+              aria-hidden="true"
+            >
+              <g
+                stroke="#efffe8"
+                strokeOpacity=".6"
+                strokeWidth="2"
+                fill="none"
               >
-                <span className="mb-1 rounded bg-black/30 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white/90">
-                  {position.label}
-                </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={`dream-player ${player ? "touch-none" : ""} ${picked && picked === player?.id ? "ring-2 ring-amber-300" : ""}`}
-                  aria-label={`${position.label}: ${player ? memberLabel(player) : "Chưa chọn cầu thủ"}`}
-                  aria-pressed={!!player && picked === player.id}
-                  onPointerDown={(e) => {
-                    if (player) pointerDown(e, player.id);
-                  }}
-                  onPointerMove={pointerMove}
-                  onPointerUp={pointerUp}
-                  onPointerCancel={cancelDrag}
-                  onClick={() => {
-                    if (suppressClick.current) {
-                      suppressClick.current = false;
-                      return;
-                    }
-                    if (picked) assign(position.id, picked);
-                    else if (player) select(player.id);
-                    else
-                      setFeedback(
-                        "Chọn một cầu thủ trong danh sách rồi chạm vị trí này.",
-                      );
-                  }}
+                <rect x="22" y="22" width="556" height="676" rx="3" />
+                <path d="M22 360H578" />
+                <circle cx="300" cy="360" r="70" />
+                <circle cx="300" cy="360" r="3" fill="#efffe8" />
+                <path d="M165 22V133H435V22M165 698V587H435V698M235 22V65H365V22M235 698V655H365V698M263 22V8H337V22M263 698V712H337V698M247 133Q300 190 353 133M247 587Q300 530 353 587" />
+                <path d="M22 42Q42 42 42 22M558 22Q558 42 578 42M22 678Q42 678 42 698M558 698Q558 678 578 678" />
+              </g>
+            </svg>
+            {positions.map((position) => {
+              const player = members.find((m) => m.id === players[position.id]);
+              return (
+                <div
+                  key={position.id}
+                  data-dream-position={position.id}
+                  className={`dream-position ${hovered === `position:${position.id}` ? "dream-drop-target" : ""}`}
+                  style={{ left: `${position.x}%`, top: `${position.y}%` }}
                 >
-                  <Shirt number={player?.jerseyNumber} empty={!player} />
-                  <span className="dream-player-name">
-                    {player?.name ?? "Chọn cầu thủ"}
+                  <span className="mb-1 rounded bg-black/30 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white/90">
+                    {position.label}
                   </span>
-                </button>
-                {player && (
                   <button
                     type="button"
                     disabled={busy}
-                    className="dream-remove"
-                    aria-label={`Bỏ ${memberLabel(player)} khỏi ${position.label}`}
+                    className={`dream-player ${player ? "touch-none" : ""} ${picked && picked === player?.id ? "ring-2 ring-amber-300" : ""}`}
+                    aria-label={`${position.label}: ${player ? memberLabel(player) : "Chưa chọn cầu thủ"}`}
+                    aria-pressed={!!player && picked === player.id}
+                    onPointerDown={(e) => {
+                      if (player) pointerDown(e, player.id);
+                    }}
+                    onPointerMove={pointerMove}
+                    onPointerUp={pointerUp}
+                    onPointerCancel={cancelDrag}
                     onClick={() => {
-                      const next = { ...players };
-                      delete next[position.id];
-                      change({ formation: current.formation, players: next });
-                      if (picked === player.id) setPicked("");
+                      if (suppressClick.current) {
+                        suppressClick.current = false;
+                        return;
+                      }
+                      if (picked)
+                        assign({ kind: "position", id: position.id }, picked);
+                      else if (player) select(player.id);
+                      else
+                        setFeedback(
+                          "Chọn một cầu thủ trong danh sách rồi chạm vị trí này.",
+                        );
                     }}
                   >
-                    ×
+                    <Shirt number={player?.jerseyNumber} empty={!player} />
+                    <span className="dream-player-name">
+                      {player?.name ?? "Chọn cầu thủ"}
+                    </span>
                   </button>
-                )}
-              </div>
-            );
-          })}
+                  {player && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className="dream-remove"
+                      aria-label={`Bỏ ${memberLabel(player)} khỏi ${position.label}`}
+                      onClick={() => {
+                        const next = { ...players };
+                        delete next[position.id];
+                        change({
+                          formation: current.formation,
+                          players: next,
+                          support,
+                        });
+                        if (picked === player.id) setPicked("");
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <SupportRail
+            support={support}
+            members={members}
+            picked={picked}
+            hovered={hovered}
+            busy={busy}
+            onClick={(role, index, currentId) => {
+              if (picked) assign({ kind: "support", id: `${role}:${index}` }, picked);
+              else if (currentId) select(currentId);
+              else
+                setFeedback(
+                  "Chọn một cầu thủ trong danh sách rồi chạm vị trí hỗ trợ này.",
+                );
+            }}
+            onRemove={(role, index) => {
+              const next = normalizeSupport(support);
+              const ids = [...(next[role] ?? [])];
+              ids.splice(index, 1);
+              if (ids.length) next[role] = ids;
+              else delete next[role];
+              change({ formation: current.formation, players, support: next });
+            }}
+          />
         </div>
         <div className="order-1 min-w-0 rounded-xl border border-white/10 bg-black/10 p-4 lg:order-2">
           <h3 className="font-bold">
@@ -499,6 +680,9 @@ function DreamTeamEditor({
           <div className="mt-4 flex gap-2 overflow-x-auto pb-2 lg:max-h-[520px] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
             {members.map((m) => {
               const assigned = positions.find((p) => players[p.id] === m.id);
+              const assignedSupport = supportRoles.find((role) =>
+                support[role.id]?.includes(m.id),
+              );
               return (
                 <button
                   type="button"
@@ -525,7 +709,7 @@ function DreamTeamEditor({
                     {m.name}
                   </span>
                   <span className="shrink-0 text-[10px] text-blue-200">
-                    {assigned?.label ?? "＋"}
+                    {assigned?.label ?? assignedSupport?.shortLabel ?? "＋"}
                   </span>
                 </button>
               );
@@ -560,6 +744,7 @@ function DreamTeamEditor({
                   memberId: owner.id,
                   formation: current.formation,
                   players,
+                  support,
                 },
                 "Đã lưu đội bóng trong mơ.",
               )

@@ -8,7 +8,8 @@
   height: auto;
   margin-inline: auto;
   border: 1px solid #bbf7d04d;
-  border-radius: 16px;
+  border-radius: 16px 0 0 16px;
+  border-right: 0;
   overflow: hidden;
   background: repeating-linear-gradient(
     0deg,
@@ -18,6 +19,140 @@
     #378622 20%
   );
   box-shadow: inset 0 0 60px #06230d80;
+}
+.dream-board-with-support {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 176px;
+  gap: 0;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  align-items: stretch;
+}
+.dream-support-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 8px 10px 12px;
+  border-radius: 0 16px 16px 0;
+  background: #368521;
+  box-shadow: inset 0 0 24px #021d3d66;
+}
+.dream-support-zone {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  border: 1px dashed #bfdbfeaa;
+  border-radius: 14px;
+  padding: 7px 6px 8px;
+}
+.dream-support-zone-heading {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #eff6ff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+}
+.dream-support-zone-heading .dream-support-icon {
+  width: 21px;
+  height: 21px;
+}
+.dream-support-slots {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+  gap: 6px 4px;
+  padding-top: 5px;
+}
+.dream-support-slot {
+  position: relative;
+  min-width: 0;
+  border-radius: 999px;
+}
+.dream-support-button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0;
+  border-radius: 10px;
+  color: white;
+  text-align: center;
+}
+.dream-support-button:hover {
+  background: #4ea8e833;
+}
+.dream-support-player-circle {
+  display: flex;
+  width: clamp(30px, 5vw, 42px);
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #bfdbfe;
+  border-radius: 50%;
+  background: #07539a;
+  color: #fff;
+  font-size: clamp(12px, 2vw, 16px);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 5px #021d3d80;
+}
+.dream-support-empty {
+  border: 2px dashed #dbeafecc;
+  background: #07539a40;
+}
+.dream-support-player {
+  display: block;
+  width: 100%;
+  min-height: 2.2em;
+  overflow-wrap: anywhere;
+  color: #eff6ff;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.dream-support-remove {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  z-index: 2;
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #041c36dd;
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+}
+.dream-support-slot.dream-drop-target {
+  outline: 2px dashed #fcd34d;
+  outline-offset: 3px;
+}
+.dream-support-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.dream-support-label {
+  color: #dbeafe;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
 }
 .dream-position {
   position: absolute;
@@ -75,6 +210,27 @@
   background: #092219e8;
   color: white;
   font-size: 20px;
+}
+@media (max-width: 480px) {
+  .dream-board-with-support {
+    grid-template-columns: minmax(0, 1fr) 126px;
+  }
+  .dream-support-rail {
+    padding: 8px 5px 8px 7px;
+  }
+  .dream-support-zone {
+    padding-inline: 4px;
+  }
+  .dream-support-zone-heading {
+    font-size: 8px;
+  }
+  .dream-support-zone-heading .dream-support-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .dream-support-player {
+    font-size: 7px;
+  }
 }
 :root {
   color-scheme: dark;
