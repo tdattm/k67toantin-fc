@@ -63,9 +63,9 @@ Trong trang đội, chọn thành viên ở mục **Đội bóng trong mơ** đ�
 - **3-1-2:** GK, LB, CB, RB, CM và hai ST (trái/phải).
 - **2-3-1:** GK, hai CB (trái/phải), LM, CM, RM và ST.
 
-Kéo tên cầu thủ từ danh sách vào vị trí trên sân. Trên điện thoại, kéo từ số áo màu xanh hoặc chạm tên rồi chạm vị trí; dùng bàn phím Tab và Enter cũng được. Sân có áo xanh Italia, số áo trên áo và tên bên dưới. Mỗi cầu thủ chỉ chiếm một vị trí; kéo giữa hai vị trí có người sẽ hoán đổi. Nút × đưa cầu thủ về danh sách.
+Kéo tên cầu thủ từ danh sách vào sân hoặc hành lang xanh nối bên phải sân. Hành lang có ba khu vực nét đứt bo góc: **Y tế**, **Xách nước / bổ cam** và **Siêu dự bị**, mỗi khu vực có biểu tượng riêng và tối đa 4 cầu thủ. Mỗi vị trí hiển thị vòng tròn số áo, tên ở dưới; vòng tròn nét đứt là vị trí còn trống. Trên điện thoại, kéo từ số áo màu xanh hoặc chạm tên rồi chạm vị trí; dùng bàn phím Tab và Enter cũng được. Sân có áo xanh Italia, số áo trên áo và tên bên dưới. Mỗi cầu thủ chỉ chiếm một vị trí trên sân hoặc hành lang; nút × đưa cầu thủ về danh sách.
 
-Bấm **Lưu đội hình** để lưu lựa chọn của thành viên; có thể lưu khi chưa đủ 7 người. Đổi sơ đồ giữ các vị trí chung, các vị trí không còn phù hợp được trả về danh sách. Bấm **Huỷ thay đổi đội hình** để khôi phục bản đã lưu. Bản nháp không bị ghi đè bởi polling; nếu mất mạng khi lưu, bản nháp vẫn còn.
+Bấm **Lưu đội hình** để lưu lựa chọn của thành viên; có thể lưu khi chưa đủ 7 người hoặc chưa chọn vị trí hỗ trợ. Đổi sơ đồ giữ các vị trí chung, các vị trí không còn phù hợp được trả về danh sách. Bấm **Huỷ thay đổi đội hình** để khôi phục bản đã lưu. Bản nháp không bị ghi đè bởi polling; nếu mất mạng khi lưu, bản nháp vẫn còn.
 
 Đội hình lưu cùng dữ liệu đội trong JSON/Redis, dùng chung thời hạn 28 ngày. Xoá thành viên sẽ bỏ cầu thủ đó khỏi mọi đội hình và xoá đội hình riêng của họ. Dữ liệu đội cũ không cần chuyển đổi. Giống lịch rảnh, ai có link cũng có thể chọn tên để xem hoặc sửa đội hình; không có xác thực danh tính.
 

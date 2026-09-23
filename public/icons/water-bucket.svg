@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>Xô nước</title>
+  <path d="M118 128h276l-28 324H146z" fill="#fff" stroke="#344b86" stroke-width="18"/>
+  <path d="M143 128h226" fill="none" stroke="#344b86" stroke-width="18" stroke-linecap="round"/>
+  <path d="M166 85h180" fill="none" stroke="#344b86" stroke-width="18" stroke-linecap="round"/>
+  <path d="M132 151c-86-20-104 58-58 145 17 32 34 57 67 73M380 151c86-20 104 58 58 145-17 32-34 57-67 73" fill="none" stroke="#344b86" stroke-width="18" stroke-linecap="round"/>
+  <path d="M154 320c68-36 136-36 204 0v111H154z" fill="#a99af5"/>
+  <path d="M145 432h222l-7 35c-6 29-25 40-54 40H206c-29 0-48-11-54-40z" fill="#8e7de6" stroke="#344b86" stroke-width="18"/>
+  <path d="M118 128c-6-29 8-54 34-54h208c26 0 40 25 34 54" fill="#fff" stroke="#344b86" stroke-width="18"/>
+  <path d="M132 117c67-29 181-29 248 0" fill="none" stroke="#f8e9ad" stroke-width="27"/>
+  <path d="M154 128c56-20 148-20 204 0" fill="none" stroke="#a99af5" stroke-width="25"/>
+</svg>

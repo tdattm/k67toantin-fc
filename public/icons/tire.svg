@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>Lốp xe</title>
+  <circle cx="256" cy="256" r="190" fill="#101820" stroke="#94a3b8" stroke-width="24"/>
+  <circle cx="256" cy="256" r="92" fill="#334155" stroke="#d1d5db" stroke-width="20"/>
+  <circle cx="256" cy="256" r="45" fill="#101820"/>
+  <path d="M256 70v94M442 256h-94M256 442v-94M70 256h94M124 124l66 66M388 124l-66 66M388 388l-66-66M124 388l66-66" fill="none" stroke="#64748b" stroke-width="24" stroke-linecap="round"/>
+</svg>

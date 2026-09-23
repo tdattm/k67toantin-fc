@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { body, failure, reply, validName } from "@/lib/api";
 import { ApiError, getTeam, updateTeam } from "@/lib/store";
-import { formations, isFormation } from "@/lib/dream-team";
+import {
+  formations,
+  isFormation,
+  MAX_SUPPORT_PLAYERS,
+  normalizeSupport,
+  supportRoles,
+} from "@/lib/dream-team";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ slug: string }> };
@@ -80,9 +86,44 @@ export async function PATCH(request: Request, context: Context) {
             400,
             "Mỗi cầu thủ chỉ được xuất hiện ở một vị trí.",
           );
+        const supportData = data.support;
+        if (
+          supportData !== undefined &&
+          (typeof supportData !== "object" ||
+            supportData === null ||
+            Array.isArray(supportData))
+        )
+          throw new ApiError(400, "Danh sách vị trí phụ không hợp lệ.");
+        const supportEntries = Object.entries(supportData ?? {});
+        if (supportEntries.some(([role]) => !supportRoles.some((item) => item.id === role)))
+          throw new ApiError(400, "Vị trí phụ hoặc cầu thủ không còn hợp lệ.");
+        const normalizedSupportEntries = supportEntries.map(([role, value]) => {
+          const ids = Array.isArray(value)
+            ? value
+            : typeof value === "string"
+              ? [value]
+              : null;
+          if (
+            !ids ||
+            ids.length > MAX_SUPPORT_PLAYERS ||
+            !ids.every((id) => typeof id === "string" && memberIds.has(id))
+          )
+            throw new ApiError(400, "Vị trí phụ hoặc cầu thủ không còn hợp lệ.");
+          return [role, ids] as const;
+        });
+        const supportIds = normalizedSupportEntries.flatMap(([, ids]) => ids);
+        if (
+          new Set([...entries.map(([, id]) => id), ...supportIds]).size !==
+          entries.length + supportIds.length
+        )
+          throw new ApiError(
+            400,
+            "Mỗi cầu thủ chỉ được chọn một vị trí trong đội hình.",
+          );
         member.dreamTeam = {
           formation,
           players: Object.fromEntries(entries) as Record<string, string>,
+          support: Object.fromEntries(normalizedSupportEntries),
           updatedAt: new Date().toISOString(),
         };
       } else if (data.action === "remove" || data.action === "availability") {
@@ -97,6 +138,17 @@ export async function PATCH(request: Request, context: Context) {
                   ([, id]) => id !== data.memberId,
                 ),
               );
+              if (remaining.dreamTeam.support) {
+                const support = normalizeSupport(remaining.dreamTeam.support);
+                for (const role of supportRoles) {
+                  const ids = support[role.id]?.filter(
+                    (id) => id !== data.memberId,
+                  );
+                  if (ids?.length) support[role.id] = ids;
+                  else delete support[role.id];
+                }
+                remaining.dreamTeam.support = support;
+              }
             }
           }
         } else {
