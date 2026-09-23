@@ -1,0 +1,121 @@
+@import "tailwindcss";
+:root {
+  color-scheme: dark;
+}
+body {
+  background: #091f18;
+  color: #eef7ef;
+  font-family: Arial, Helvetica, sans-serif;
+  background-image: radial-gradient(
+    ellipse at 80% 0%,
+    #16433170,
+    transparent 55%
+  );
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+button,
+a,
+input,
+select {
+  outline-offset: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid #bef264;
+}
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/10 bg-[#102b22] shadow-xl shadow-black/5;
+  }
+  .eyebrow {
+    @apply text-[11px] font-bold tracking-[.18em] text-amber-300;
+  }
+  .label {
+    @apply text-sm font-semibold text-emerald-50/80;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/15 bg-[#0a211a] px-4 py-3 text-base text-white placeholder:text-emerald-100/30;
+  }
+  .primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-4 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-emerald-950 transition-colors hover:bg-amber-200;
+  }
+  .secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5;
+  }
+  .chip {
+    @apply rounded-full border border-white/10 px-4 py-2;
+  }
+  .stat {
+    @apply rounded-xl border border-white/10 bg-white/[.025] p-4 sm:p-5;
+  }
+  .error {
+    @apply rounded-xl border border-red-300/20 bg-red-300/10 p-4 text-sm text-red-200;
+  }
+  .slot {
+    @apply flex h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[.025] text-lg text-white/20 transition-colors hover:border-amber-300/50 sm:h-14;
+  }
+  .slot-selected {
+    @apply border-amber-300 bg-amber-300 text-emerald-950;
+  }
+}
+.pitch {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #b9ef9a25;
+  border-radius: 12px;
+  background: repeating-linear-gradient(
+    90deg,
+    #ffffff02 0,
+    #ffffff02 55px,
+    transparent 55px,
+    transparent 110px
+  );
+}
+.pitch::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  border: 1px solid #b9ef9a30;
+  border-radius: 3px;
+}
+.pitch::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 50%;
+  border-left: 1px solid #b9ef9a30;
+}
+.pitch-circle {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  border: 1px solid #b9ef9a30;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.pitch-ball {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  z-index: 1;
+}
+.pitch-label {
+  position: absolute;
+  bottom: 26px;
+  width: 100%;
+  text-align: center;
+  color: #bbf7d060;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+}
