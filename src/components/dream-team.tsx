@@ -116,8 +116,9 @@ function SupportRail({
                   >
                     <button
                       type="button"
-                      disabled={busy || preview}
-                      className={`dream-support-button ${picked && picked === member?.id ? "ring-2 ring-amber-300" : ""}`}
+                      disabled={busy}
+                      aria-disabled={preview}
+                      className={`dream-support-button ${preview ? "pointer-events-none" : ""} ${picked && picked === member?.id ? "ring-2 ring-amber-300" : ""}`}
                       aria-label={`${role.label}, vị trí ${index + 1}: ${member ? memberLabel(member) : "Trống"}`}
                       onClick={() => onClick?.(role.id, index, member?.id)}
                     >
@@ -419,7 +420,8 @@ function DreamTeamEditor({
       const [role, indexValue] = target.id.split(":");
       const index = Number(indexValue);
       const ids = [...(nextSupport[role as SupportRole] ?? [])];
-      ids[index] = id;
+      if (index < ids.length) ids[index] = id;
+      else ids.push(id);
       nextSupport[role as SupportRole] = ids.slice(0, MAX_SUPPORT_PLAYERS);
       change({
         formation: current.formation,
