@@ -99,7 +99,7 @@ export async function PATCH(request: Request, context: Context) {
           throw new ApiError(400, "Vị trí phụ hoặc cầu thủ không còn hợp lệ.");
         const normalizedSupportEntries = supportEntries.map(([role, value]) => {
           const ids = Array.isArray(value)
-            ? value
+            ? Array.from(value)
             : typeof value === "string"
               ? [value]
               : null;

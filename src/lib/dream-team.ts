@@ -62,9 +62,10 @@ export function normalizeSupport(
       : typeof value === "string"
         ? [value]
         : [];
-    const ids = values
-      .filter((id): id is string => typeof id === "string")
-      .slice(0, MAX_SUPPORT_PLAYERS);
+    const ids = [...new Set(values.filter((id): id is string => typeof id === "string"))].slice(
+      0,
+      MAX_SUPPORT_PLAYERS,
+    );
     if (ids.length) normalized[role.id] = ids;
   }
   return normalized;
@@ -116,7 +117,6 @@ export function popularDreamTeam(
   for (const role of supportRoles) {
     const votes = new Map<string, number>();
     for (const dreamTeam of saved) {
-      if (dreamTeam.formation !== formation) continue;
       for (const memberId of normalizeSupport(dreamTeam.support)[role.id] ?? [])
         votes.set(memberId, (votes.get(memberId) ?? 0) + 1);
     }
