@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Quản lý đội và thành viên</title>
+  <desc id="desc">Danh sách thành viên có số áo, đội trưởng và tùy chọn mã tham gia.</desc>
+  <rect width="960" height="360" rx="24" fill="#082c24"/>
+  <text x="40" y="48" fill="#fbbf24" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2">QUẢN LÝ ĐỘI</text>
+  <text x="40" y="87" fill="#f0fdf4" font-family="Arial,sans-serif" font-size="25" font-weight="700">FC Sân Cỏ</text>
+  <text x="40" y="111" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="14">18 thành viên · Link mời sẵn sàng chia sẻ</text>
+  <rect x="40" y="132" width="550" height="194" rx="16" fill="#104538" stroke="#276b53"/>
+  <text x="66" y="163" fill="#b8d4c4" font-family="Arial,sans-serif" font-size="12" font-weight="700">SỐ ÁO</text>
+  <text x="130" y="163" fill="#b8d4c4" font-family="Arial,sans-serif" font-size="12" font-weight="700">THÀNH VIÊN</text>
+  <text x="506" y="163" fill="#b8d4c4" font-family="Arial,sans-serif" font-size="12" font-weight="700">VAI TRÒ</text>
+  <g font-family="Arial,sans-serif" font-size="15">
+    <rect x="60" y="177" width="510" height="40" rx="8" fill="#165340"/><circle cx="88" cy="197" r="14" fill="#fbbf24"/><text x="88" y="202" fill="#17372a" font-size="12" font-weight="700" text-anchor="middle">10</text><text x="130" y="202" fill="#f0fdf4">Minh Anh</text><rect x="494" y="186" width="61" height="22" rx="11" fill="#fbbf24"/><text x="524" y="201" fill="#17372a" font-size="10" font-weight="700" text-anchor="middle">ĐỘI TRƯỞNG</text>
+    <rect x="60" y="224" width="510" height="40" rx="8" fill="#165340"/><circle cx="88" cy="244" r="14" fill="#32c48d"/><text x="88" y="249" fill="#12362b" font-size="12" font-weight="700" text-anchor="middle">07</text><text x="130" y="249" fill="#f0fdf4">Gia Huy</text><text x="506" y="249" fill="#b8d4c4" font-size="12">Thành viên</text>
+    <rect x="60" y="271" width="510" height="40" rx="8" fill="#165340"/><circle cx="88" cy="291" r="14" fill="#32c48d"/><text x="88" y="296" fill="#12362b" font-size="12" font-weight="700" text-anchor="middle">23</text><text x="130" y="296" fill="#f0fdf4">Bảo Khang</text><text x="506" y="296" fill="#b8d4c4" font-size="12">Thành viên</text>
+  </g>
+  <rect x="620" y="132" width="300" height="194" rx="16" fill="#104538" stroke="#276b53"/>
+  <text x="646" y="166" fill="#f0fdf4" font-family="Arial,sans-serif" font-size="18" font-weight="700">Mã tham gia</text>
+  <text x="646" y="190" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="13">Thêm một bước bảo vệ link mời</text>
+  <rect x="646" y="210" width="248" height="49" rx="10" fill="#082c24" stroke="#276b53"/>
+  <text x="770" y="242" fill="#fbbf24" font-family="Arial,sans-serif" font-size="23" font-weight="700" letter-spacing="6" text-anchor="middle">••••••</text>
+  <rect x="646" y="275" width="111" height="32" rx="16" fill="#fbbf24"/><text x="701" y="296" fill="#17372a" font-family="Arial,sans-serif" font-size="12" font-weight="700" text-anchor="middle">ĐỔI MÃ</text>
+  <text x="773" y="296" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="12">Đội trưởng</text>
+</svg>
