@@ -2,6 +2,7 @@ import type { DreamTeam } from "./dream-team";
 
 export type Member = {
   id: string;
+  uid?: string;
   name: string;
   jerseyNumber?: number;
   slots: number[];
@@ -10,9 +11,22 @@ export type Member = {
 };
 export type Team = {
   slug: string;
+  kind?: "legacy" | "account";
+  creatorUid?: string;
+  captainUid?: string;
+  joinPinHash?: string;
   name: string;
+  createdAt?: number;
   expiresAt: number;
   members: Member[];
+  captainMemberId?: string;
+  captainTokenHash?: string;
+  accessPinHash?: string;
+  hasPin?: boolean;
+};
+export type TeamSummary = Pick<Team, "slug" | "name" | "expiresAt"> & {
+  memberCount: number;
+  requiresPin: boolean;
 };
 export function memberLabel(member: Member) {
   return member.jerseyNumber === undefined

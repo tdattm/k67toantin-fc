@@ -155,10 +155,12 @@ export function DreamTeamSection({
   team,
   busy,
   onSave,
+  editableOwnerId,
 }: {
   team: Team;
   busy: boolean;
   onSave: Save;
+  editableOwnerId?: string;
 }) {
   const popular = popularDreamTeam(team.members);
   const popularId = "__popular__";
@@ -223,7 +225,7 @@ export function DreamTeamSection({
           </p>
         )}
       </div>
-      {owner ? (
+      {owner && (editableOwnerId === undefined || owner.id === editableOwnerId) ? (
         <DreamTeamEditor
           key={owner.id}
           owner={owner}
@@ -232,6 +234,10 @@ export function DreamTeamSection({
           onSave={onSave}
           onDirty={setDirty}
         />
+      ) : owner?.dreamTeam ? (
+        <PopularDreamTeamPreview dreamTeam={owner.dreamTeam} members={team.members} votes={0} ownerName={owner.name} />
+      ) : owner ? (
+        <p className="mt-6 text-sm text-emerald-100/60">Thành viên này chưa lưu Dream Team.</p>
       ) : popular ? (
         <PopularDreamTeamPreview
           dreamTeam={popular.dreamTeam}
@@ -253,10 +259,12 @@ function PopularDreamTeamPreview({
   dreamTeam,
   members,
   votes,
+  ownerName,
 }: {
   dreamTeam: DreamTeam;
   members: Member[];
   votes: number;
+  ownerName?: string;
 }) {
   const positions = formations[dreamTeam.formation];
   return (
@@ -264,12 +272,11 @@ function PopularDreamTeamPreview({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-amber-200">
-            Đội hình chung được bình chọn nhiều nhất
+            {ownerName ? `Đội hình của ${ownerName}` : "Đội hình chung được bình chọn nhiều nhất"}
           </p>
           <p className="mt-1 text-xs text-emerald-100/55">
             Sơ đồ <strong className="text-white">{dreamTeam.formation}</strong>{" "}
-            · tổng hợp từ {votes} đội hình đã lưu. Cầu thủ mỗi vị trí là lựa
-            chọn phổ biến nhất.
+            {ownerName ? " · Chế độ xem." : ` · tổng hợp từ ${votes} đội hình đã lưu. Cầu thủ mỗi vị trí là lựa chọn phổ biến nhất.`}
           </p>
         </div>
         <span className="rounded-full bg-amber-300/10 px-3 py-1 text-xs font-bold text-amber-200">
@@ -326,8 +333,7 @@ function PopularDreamTeamPreview({
         />
       </div>
       <p className="mt-3 text-xs text-emerald-100/50">
-        Đây là đội hình tổng hợp. Chọn tên thành viên ở trên để xem hoặc chỉnh
-        đội hình cá nhân.
+        {ownerName ? "Chỉ chủ đội hình mới được chỉnh sửa." : "Đây là đội hình tổng hợp. Chọn tên thành viên ở trên để xem hoặc chỉnh đội hình cá nhân."}
       </p>
     </div>
   );

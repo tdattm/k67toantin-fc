@@ -1,6 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { body, failure, reply, validName } from "@/lib/api";
 import { ApiError, getTeam, updateTeam } from "@/lib/store";
+import { updateAccountTeam, deleteAccountTeam } from "@/lib/account-store";
+import { firebaseUser } from "@/lib/firebase-server";
+import {
+  hashCaptainToken,
+  hashTeamPin,
+  isCaptainTokenValid,
+  newCaptainToken,
+  verifyTeamPin,
+} from "@/lib/team-security";
 import {
   formations,
   isFormation,
@@ -11,9 +20,36 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ slug: string }> };
-export async function GET(_request: Request, context: Context) {
+function pinAccess(request: Request, team: Awaited<ReturnType<typeof getTeam>>) {
+  if (!team.accessPinHash) return;
+  let allowed: boolean;
   try {
-    return reply({ team: await getTeam((await context.params).slug) });
+    allowed = verifyTeamPin(request.headers.get("x-team-pin"), team.accessPinHash);
+  } catch {
+    throw new ApiError(503, "Mã PIN của đội không hợp lệ. Hãy báo đội trưởng kiểm tra lại.");
+  }
+  if (!allowed) throw new ApiError(401, "Bạn cần nhập đúng PIN 6 số để vào đội.");
+}
+
+function publicTeam(team: Awaited<ReturnType<typeof getTeam>>) {
+  const { accessPinHash: _accessPinHash, captainTokenHash: _captainTokenHash, joinPinHash: _joinPinHash, creatorUid: _creatorUid, ...visible } = team;
+  return { ...visible, hasPin: Boolean(team.kind === "account" ? team.joinPinHash : team.accessPinHash) };
+}
+
+export async function GET(request: Request, context: Context) {
+  try {
+    const team = await getTeam((await context.params).slug);
+    if (team.kind === "account") {
+      const user = await firebaseUser(request);
+      if (!team.members.some((member) => member.uid === user.uid)) throw new ApiError(403, "Bạn chưa là thành viên đội này.");
+      return reply({ team: publicTeam(team), isCaptain: team.captainUid === user.uid, memberId: user.uid, canClaimCaptain: false });
+    }
+    pinAccess(request, team);
+    return reply({
+      team: publicTeam(team),
+      isCaptain: isCaptainTokenValid(team.captainTokenHash, request.headers.get("x-captain-token")),
+      canClaimCaptain: !team.captainTokenHash,
+    });
   } catch (error) {
     return failure(error);
   }
@@ -21,8 +57,58 @@ export async function GET(_request: Request, context: Context) {
 export async function PATCH(request: Request, context: Context) {
   try {
     const data = await body(request);
-    const team = await updateTeam((await context.params).slug, (team) => {
-      if (data.action === "add") {
+    const slug = (await context.params).slug;
+    const existing = await getTeam(slug);
+    const user = existing.kind === "account" ? await firebaseUser(request) : null;
+    const captainToken = request.headers.get("x-captain-token");
+    let captainTransferToken: string | undefined;
+    if (!user && (data.action === "transferCaptain" || data.action === "claimCaptain"))
+      captainTransferToken = newCaptainToken();
+    const edit = (team: Awaited<ReturnType<typeof getTeam>>) => {
+      if (user) {
+        if (team.kind !== "account") throw new ApiError(409, "Chế độ đội đã thay đổi.");
+        if (!team.members.some((member) => member.uid === user.uid)) throw new ApiError(403, "Bạn chưa là thành viên đội này.");
+        if (["setPin", "transferCaptain", "remove"].includes(data.action) && team.captainUid !== user.uid)
+          throw new ApiError(403, "Chỉ đội trưởng hiện tại được thực hiện thao tác này.");
+        if (["availability", "dreamTeam"].includes(data.action) && data.memberId !== user.uid)
+          throw new ApiError(403, "Chỉ được sửa lịch và Dream Team của chính mình.");
+        if (data.action === "leave" && data.memberId !== user.uid)
+          throw new ApiError(403, "Chỉ được rời đội bằng tài khoản của mình.");
+        if (["add", "claimCaptain"].includes(data.action)) throw new ApiError(403, "Thành viên đội mới phải tự tham gia bằng tài khoản.");
+      } else {
+        if (team.kind === "account") throw new ApiError(403, "Đội tài khoản cần xác thực Firebase.");
+        pinAccess(request, team);
+      }
+      if (data.action === "setPin") {
+        if (user) {
+          if (data.pin === null || data.pin === "") delete team.joinPinHash;
+          else if (typeof data.pin !== "string" || !/^\d{6}$/.test(data.pin)) throw new ApiError(400, "Mã tham gia phải có đúng 6 chữ số.");
+          else team.joinPinHash = hashTeamPin(data.pin);
+          return;
+        }
+        if (!isCaptainTokenValid(team.captainTokenHash, captainToken))
+          throw new ApiError(403, "Chỉ đội trưởng mới được tạo hoặc sửa PIN của đội.");
+        if (data.pin === null || data.pin === "") delete team.accessPinHash;
+        else if (typeof data.pin !== "string" || !/^\d{6}$/.test(data.pin))
+          throw new ApiError(400, "PIN đội phải gồm đúng 6 chữ số.");
+        else team.accessPinHash = hashTeamPin(data.pin);
+      } else if (data.action === "transferCaptain" || data.action === "claimCaptain") {
+        if (user) {
+          if (data.action !== "transferCaptain") throw new ApiError(403, "Thao tác không hợp lệ.");
+          const target = team.members.find((member) => member.id === data.memberId && member.uid);
+          if (!target) throw new ApiError(404, "Thành viên nhận quyền không còn trong đội.");
+          team.captainUid = target.uid;
+          team.captainMemberId = target.id;
+          return;
+        }
+        const claiming = data.action === "claimCaptain";
+        if (claiming ? team.captainTokenHash : !isCaptainTokenValid(team.captainTokenHash, captainToken))
+          throw new ApiError(403, claiming ? "Đội đã có đội trưởng." : "Chỉ đội trưởng mới được nhượng quyền.");
+        if (typeof data.memberId !== "string" || !team.members.some((member) => member.id === data.memberId))
+          throw new ApiError(404, "Thành viên nhận quyền không còn trong đội.");
+        team.captainMemberId = data.memberId;
+        team.captainTokenHash = hashCaptainToken(captainTransferToken!);
+      } else if (data.action === "add") {
         const name = validName(data.name);
         const nameWordCount = name.split(/\s+/).length;
         if (nameWordCount < 2)
@@ -126,10 +212,12 @@ export async function PATCH(request: Request, context: Context) {
           support: Object.fromEntries(normalizedSupportEntries),
           updatedAt: new Date().toISOString(),
         };
-      } else if (data.action === "remove" || data.action === "availability") {
+      } else if (data.action === "remove" || data.action === "leave" || data.action === "availability") {
         const member = team.members.find((m) => m.id === data.memberId);
         if (!member) throw new ApiError(404, "Thành viên không còn trong đội.");
-        if (data.action === "remove") {
+        if (data.action === "remove" || data.action === "leave") {
+          if (data.memberId === team.captainMemberId)
+            throw new ApiError(409, "Hãy nhượng quyền đội trưởng trước khi xóa thành viên này.");
           team.members = team.members.filter((m) => m.id !== data.memberId);
           for (const remaining of team.members) {
             if (remaining.dreamTeam) {
@@ -168,9 +256,28 @@ export async function PATCH(request: Request, context: Context) {
           member.updatedAt = new Date().toISOString();
         }
       } else throw new ApiError(400, "Thao tác không hợp lệ.");
+    };
+    const team = user ? await updateAccountTeam(slug, edit) : await updateTeam(slug, edit);
+    return reply({
+      team: publicTeam(team),
+      isCaptain: user ? team.captainUid === user.uid :
+        data.action === "claimCaptain" ||
+        isCaptainTokenValid(team.captainTokenHash, captainToken),
+      ...(user ? { memberId: user.uid } : {}),
+      ...(captainTransferToken ? { captainTransferToken } : {}),
     });
-    return reply({ team });
   } catch (error) {
     return failure(error);
   }
+}
+
+export async function DELETE(request: Request, context: Context) {
+  try {
+    const slug = (await context.params).slug;
+    const team = await getTeam(slug);
+    if (team.kind !== "account") throw new ApiError(403, "Đội legacy dùng đường quản trị riêng.");
+    const user = await firebaseUser(request);
+    await deleteAccountTeam(slug, user.uid);
+    return reply({ deletedCount: 1 });
+  } catch (error) { return failure(error); }
 }

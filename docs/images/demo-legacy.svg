@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Demo và đội cũ</title>
+  <desc id="desc">Đội mẫu với thành viên giả lập và thông báo chế độ chỉ đọc, cạnh đó là cách mở đội cũ bằng link.</desc>
+  <rect width="960" height="360" rx="24" fill="#082c24"/>
+  <text x="40" y="48" fill="#fbbf24" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2">XEM THỬ TRƯỚC</text>
+  <text x="40" y="87" fill="#f0fdf4" font-family="Arial,sans-serif" font-size="25" font-weight="700">Đội mẫu Sân Cỏ</text>
+  <rect x="40" y="107" width="112" height="27" rx="13" fill="#fbbf24"/><text x="96" y="125" fill="#17372a" font-family="Arial,sans-serif" font-size="11" font-weight="700" text-anchor="middle">DEMO CHỈ ĐỌC</text>
+  <text x="169" y="126" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="14">19 thành viên giả lập · Không sửa dữ liệu đội thật</text>
+  <rect x="40" y="151" width="545" height="175" rx="16" fill="#104538" stroke="#276b53"/>
+  <text x="64" y="183" fill="#f0fdf4" font-family="Arial,sans-serif" font-size="17" font-weight="700">Danh sách cầu thủ</text>
+  <g font-family="Arial,sans-serif" font-size="12">
+    <g fill="#165340"><rect x="64" y="199" width="155" height="42" rx="8"/><rect x="235" y="199" width="155" height="42" rx="8"/><rect x="406" y="199" width="155" height="42" rx="8"/><rect x="64" y="253" width="155" height="42" rx="8"/><rect x="235" y="253" width="155" height="42" rx="8"/><rect x="406" y="253" width="155" height="42" rx="8"/></g>
+    <g fill="#fbbf24" font-weight="700"><text x="78" y="225">01</text><text x="249" y="225">02</text><text x="420" y="225">03</text><text x="78" y="279">04</text><text x="249" y="279">05</text><text x="420" y="279">06</text></g>
+    <g fill="#f0fdf4"><text x="105" y="225">An Minh</text><text x="276" y="225">Bình Khang</text><text x="447" y="225">Chi Bảo</text><text x="105" y="279">Duy Phong</text><text x="276" y="279">Gia Huy</text><text x="447" y="279">Hải Nam</text></g>
+  </g>
+  <rect x="615" y="107" width="305" height="219" rx="16" fill="#104538" stroke="#276b53"/>
+  <circle cx="665" cy="157" r="23" fill="#165340"/><path d="M654 157h22m-11-11v22" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+  <text x="701" y="153" fill="#f0fdf4" font-family="Arial,sans-serif" font-size="17" font-weight="700">Bạn có link đội cũ?</text>
+  <text x="646" y="202" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="14">Mở link đã được chia sẻ để</text>
+  <text x="646" y="224" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="14">tiếp tục xem lịch và đội hình.</text>
+  <text x="646" y="246" fill="#a7cbb8" font-family="Arial,sans-serif" font-size="14">Không cần tạo tài khoản.</text>
+  <rect x="646" y="268" width="240" height="37" rx="10" fill="#165340"/>
+  <text x="766" y="292" fill="#fbbf24" font-family="Arial,sans-serif" font-size="13" font-weight="700" text-anchor="middle">MỞ LINK ĐỘI CỦA BẠN ↗</text>
+</svg>
