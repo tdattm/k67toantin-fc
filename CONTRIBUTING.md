@@ -10,7 +10,7 @@ Cảm ơn bạn muốn cải thiện Lịch Đá Bóng Đội. Mọi đóng góp
 
 ## Chuẩn bị môi trường
 
-1. Cài Git và Node.js phiên bản 20.9 trở lên.
+1. Cài Git và Node.js 24.
 2. Fork repository, sau đó clone fork của bạn:
 
    ```bash

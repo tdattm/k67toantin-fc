@@ -8,7 +8,7 @@ Mở **[k67toantin-fc.vercel.app](https://k67toantin-fc.vercel.app)** để đă
 
 ## Chạy trên máy cá nhân
 
-1. Cài [Git](https://git-scm.com/downloads) và [Node.js phiên bản 20.9 trở lên](https://nodejs.org/).
+1. Cài [Git](https://git-scm.com/downloads) và [Node.js 24](https://nodejs.org/).
 2. Mở Terminal hoặc PowerShell, clone repository:
 
    ```bash

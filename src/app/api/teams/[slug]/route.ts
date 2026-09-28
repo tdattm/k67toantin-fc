@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { body, failure, reply, validName } from "@/lib/api";
 import { ApiError, getTeam, updateTeam } from "@/lib/store";
 import { updateAccountTeam, deleteAccountTeam } from "@/lib/account-store";
-import { firebaseUser } from "@/lib/firebase-server";
 import {
   hashCaptainToken,
   hashTeamPin,
@@ -20,6 +19,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ slug: string }> };
+async function accountUser(request: Request) {
+  const { firebaseUser } = await import("@/lib/firebase-server");
+  return firebaseUser(request);
+}
 function pinAccess(request: Request, team: Awaited<ReturnType<typeof getTeam>>) {
   if (!team.accessPinHash) return;
   let allowed: boolean;
@@ -40,7 +43,7 @@ export async function GET(request: Request, context: Context) {
   try {
     const team = await getTeam((await context.params).slug);
     if (team.kind === "account") {
-      const user = await firebaseUser(request);
+      const user = await accountUser(request);
       if (!team.members.some((member) => member.uid === user.uid)) throw new ApiError(403, "Bạn chưa là thành viên đội này.");
       return reply({ team: publicTeam(team), isCaptain: team.captainUid === user.uid, memberId: user.uid, canClaimCaptain: false });
     }
@@ -59,7 +62,7 @@ export async function PATCH(request: Request, context: Context) {
     const data = await body(request);
     const slug = (await context.params).slug;
     const existing = await getTeam(slug);
-    const user = existing.kind === "account" ? await firebaseUser(request) : null;
+    const user = existing.kind === "account" ? await accountUser(request) : null;
     const captainToken = request.headers.get("x-captain-token");
     let captainTransferToken: string | undefined;
     if (!user && (data.action === "transferCaptain" || data.action === "claimCaptain"))
@@ -276,7 +279,7 @@ export async function DELETE(request: Request, context: Context) {
     const slug = (await context.params).slug;
     const team = await getTeam(slug);
     if (team.kind !== "account") throw new ApiError(403, "Đội legacy dùng đường quản trị riêng.");
-    const user = await firebaseUser(request);
+    const user = await accountUser(request);
     await deleteAccountTeam(slug, user.uid);
     return reply({ deletedCount: 1 });
   } catch (error) { return failure(error); }
