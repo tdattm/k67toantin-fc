@@ -11,9 +11,21 @@ import { Shell } from "./shell";
 import { days, sessions, rankSlots, memberLabel, type Team } from "@/lib/team";
 import { TopSlotsChart } from "./top-slots-chart";
 import { DreamTeamSection } from "./dream-team";
+import { userFacingError } from "@/lib/user-error";
 export function TeamBoard({ slug }: { slug: string }) {
   const [team, setTeam] = useState<Team | null>(null);
   const [mode, setMode] = useState("");
+  const [teamPin, setTeamPin] = useState("");
+  const [pinEntry, setPinEntry] = useState("");
+  const [pinRequired, setPinRequired] = useState(false);
+  const [credentialsReady, setCredentialsReady] = useState(false);
+  const [captainToken, setCaptainToken] = useState("");
+  const [isCaptain, setIsCaptain] = useState(false);
+  const [canClaimCaptain, setCanClaimCaptain] = useState(false);
+  const [captainCodeEntry, setCaptainCodeEntry] = useState("");
+  const [handoverToken, setHandoverToken] = useState("");
+  const [nextPin, setNextPin] = useState("");
+  const [captainActionBusy, setCaptainActionBusy] = useState(false);
   const [selected, setSelected] = useState("");
   const [draft, setDraft] = useState<number[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -28,20 +40,33 @@ export function TeamBoard({ slug }: { slug: string }) {
   const [removeId, setRemoveId] = useState("");
   const version = useRef(0);
   const mutating = useRef(false);
+  useEffect(() => {
+    setTeamPin(sessionStorage.getItem(`team-pin:${slug}`) || "");
+    setCaptainToken(localStorage.getItem(`team-captain:${slug}`) || "");
+    setCredentialsReady(true);
+  }, [slug]);
   const request = useCallback(
-    async (body?: object): Promise<{ team: Team; storageMode: string }> => {
+    async (body?: object): Promise<{ team: Team; storageMode: string; isCaptain: boolean; canClaimCaptain: boolean; captainTransferToken?: string }> => {
       const response = await fetch(`/api/teams/${slug}`, {
         method: body ? "PATCH" : "GET",
         cache: "no-store",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(teamPin ? { "X-Team-Pin": teamPin } : {}),
+          ...(captainToken ? { "X-Captain-Token": captainToken } : {}),
+        },
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(15000),
       });
       const data = await response.json();
+      if (response.status === 401 && /PIN/i.test(data.error || "")) {
+        setPinRequired(true);
+        setTeam(null);
+      }
       if (!response.ok) throw new Error(data.error || "Không thể kết nối.");
       return data;
     },
-    [slug],
+    [slug, teamPin, captainToken],
   );
   const refresh = useCallback(async () => {
     if (mutating.current) return;
@@ -51,18 +76,21 @@ export function TeamBoard({ slug }: { slug: string }) {
       if (current === version.current) {
         setTeam(data.team);
         setMode(data.storageMode);
+        setIsCaptain(data.isCaptain === true);
+        setCanClaimCaptain(data.canClaimCaptain === true);
         setError("");
       }
     } catch (error) {
       if (current === version.current)
         setError(
-          error instanceof Error ? error.message : "Không thể tải lịch.",
+          userFacingError(error, "Không thể tải lịch. Hãy thử tải lại trang."),
         );
     } finally {
       setLoaded(true);
     }
   }, [request]);
   useEffect(() => {
+    if (!credentialsReady || pinRequired) return;
     void refresh();
     const interval = setInterval(() => {
       if (!document.hidden) void refresh();
@@ -74,7 +102,7 @@ export function TeamBoard({ slug }: { slug: string }) {
       window.removeEventListener("focus", focus);
       version.current++;
     };
-  }, [refresh]);
+  }, [refresh, credentialsReady, pinRequired]);
   const member = team?.members.find((m) => m.id === selected);
   useEffect(() => {
     if (!dirty) setDraft(member?.slots || []);
@@ -107,7 +135,7 @@ export function TeamBoard({ slug }: { slug: string }) {
       setNotice(message);
       return true;
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Không thể lưu.");
+      setError(userFacingError(error, "Không thể lưu thay đổi. Hãy thử lại."));
       return false;
     } finally {
       mutating.current = false;
@@ -151,14 +179,130 @@ export function TeamBoard({ slug }: { slug: string }) {
       setNotice(`Link của đội: ${window.location.href}`);
     }
   }
+  async function unlockTeam(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/teams/${slug}`, {
+        cache: "no-store",
+        headers: { "X-Team-Pin": pinEntry },
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "PIN chưa đúng.");
+      sessionStorage.setItem(`team-pin:${slug}`, pinEntry);
+      setTeamPin(pinEntry);
+      setTeam(data.team);
+      setMode(data.storageMode);
+      setIsCaptain(data.isCaptain === true);
+      setCanClaimCaptain(data.canClaimCaptain === true);
+      setPinRequired(false);
+      setError("");
+    } catch (error) {
+      setError(userFacingError(error, "Không thể mở đội. Hãy kiểm tra PIN rồi thử lại."));
+    } finally {
+      setBusy(false);
+      setLoaded(true);
+    }
+  }
+  async function captainAction(action: "setPin" | "transferCaptain" | "claimCaptain", values: Record<string, unknown> = {}) {
+    setCaptainActionBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const data = await request({ action, ...values });
+      setTeam(data.team);
+      setCanClaimCaptain(data.canClaimCaptain === true);
+      if (data.captainTransferToken) {
+        setHandoverToken(data.captainTransferToken);
+        if (action === "claimCaptain") {
+          localStorage.setItem(`team-captain:${slug}`, data.captainTransferToken);
+          setCaptainToken(data.captainTransferToken);
+          setIsCaptain(true);
+          setCanClaimCaptain(false);
+          setNotice("Bạn đã nhận quyền đội trưởng. Hãy giữ mã quản trị an toàn.");
+        } else {
+          localStorage.removeItem(`team-captain:${slug}`);
+          setCaptainToken("");
+          setIsCaptain(false);
+          setNotice("Đã chuyển quyền. Gửi mã bàn giao cho đội trưởng mới để họ lưu lại.");
+        }
+      } else {
+        setIsCaptain(data.isCaptain === true);
+        if (action === "setPin") {
+          const updatedPin = typeof values.pin === "string" ? values.pin : "";
+          if (updatedPin) sessionStorage.setItem(`team-pin:${slug}`, updatedPin);
+          else sessionStorage.removeItem(`team-pin:${slug}`);
+          setTeamPin(updatedPin);
+          setNextPin("");
+          setNotice(updatedPin ? "Đã cập nhật PIN của đội." : "Đã tắt PIN của đội.");
+        }
+      }
+    } catch (error) {
+      setError(userFacingError(error, "Không thể cập nhật quyền đội trưởng. Hãy thử lại."));
+    } finally {
+      setCaptainActionBusy(false);
+    }
+  }
+  async function acceptCaptainToken(event: FormEvent) {
+    event.preventDefault();
+    setCaptainActionBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/teams/${slug}`, {
+        cache: "no-store",
+        headers: {
+          ...(teamPin ? { "X-Team-Pin": teamPin } : {}),
+          "X-Captain-Token": captainCodeEntry.trim(),
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await response.json();
+      if (!response.ok || data.isCaptain !== true)
+        throw new Error(data.error || "Mã bàn giao không hợp lệ.");
+      localStorage.setItem(`team-captain:${slug}`, captainCodeEntry.trim());
+      setCaptainToken(captainCodeEntry.trim());
+      setCaptainCodeEntry("");
+      setTeam(data.team);
+      setIsCaptain(true);
+      setCanClaimCaptain(false);
+      setNotice("Đã nhận quyền đội trưởng.");
+    } catch (error) {
+      setError(userFacingError(error, "Mã bàn giao không hợp lệ. Hãy kiểm tra lại."));
+    } finally {
+      setCaptainActionBusy(false);
+    }
+  }
   if (!team)
     return (
       <Shell>
         <div className="panel mx-auto max-w-xl p-8">
           <p className="eyebrow">LỊCH CỦA ĐỘI</p>
           <h1 className="mt-4 text-2xl font-bold">
-            {loaded ? "Chưa tải được đội bóng" : "Đang tập hợp đội hình…"}
+            {pinRequired ? "Đội này được bảo vệ bằng PIN" : loaded ? "Chưa tải được đội bóng" : "Đang tập hợp đội hình…"}
           </h1>
+          {pinRequired && (
+            <form onSubmit={unlockTeam} className="mt-5">
+              <label htmlFor="team-access-pin" className="label">Nhập PIN 6 số của đội để tiếp tục</label>
+              <input
+                id="team-access-pin"
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                minLength={6}
+                maxLength={6}
+                required
+                autoFocus
+                value={pinEntry}
+                onChange={(event) => setPinEntry(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="input mt-2 max-w-48 tracking-[0.4em]"
+              />
+              <button className="primary mt-4" disabled={busy || pinEntry.length !== 6}>
+                {busy ? "Đang kiểm tra…" : "Vào đội"}
+              </button>
+            </form>
+          )}
           {error && (
             <p role="alert" className="error mt-4">
               {error}
@@ -170,7 +314,7 @@ export function TeamBoard({ slug }: { slug: string }) {
                 Thử lại
               </button>
               <Link href="/" className="secondary">
-                Tạo đội mới
+                Home
               </Link>
             </div>
           )}
@@ -187,8 +331,8 @@ export function TeamBoard({ slug }: { slug: string }) {
     <Shell>
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="min-w-0">
-          <Link href="/" className="eyebrow">
-            ← VỀ TRANG CHỦ
+          <Link href="/" className="secondary">
+            ← Home
           </Link>
           <h1 className="mt-4 break-words text-4xl font-black tracking-tight sm:text-5xl">
             {team.name}
@@ -238,6 +382,133 @@ export function TeamBoard({ slug }: { slug: string }) {
           </button>
         </p>
       )}
+      <section className="panel mb-6 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow">QUẢN LÝ ĐỘI</p>
+            <h2 className="mt-2 text-xl font-bold">Đội trưởng</h2>
+            <p className="mt-2 text-sm text-emerald-100/65">
+              {team.captainMemberId
+                ? team.members.find((item) => item.id === team.captainMemberId)?.name || "Đội trưởng hiện tại"
+                : "Chưa có đội trưởng"}
+              {isCaptain && <span className="ml-2 text-amber-300">· Bạn đang giữ quyền đội trưởng</span>}
+            </p>
+          </div>
+        </div>
+        {isCaptain && (
+          <div className="mt-5 grid gap-6 lg:grid-cols-2">
+            <div>
+              <h3 className="font-semibold">PIN bảo vệ đội</h3>
+              <p className="mt-1 text-xs leading-5 text-emerald-100/55">
+                {team.hasPin ? "Đội đang yêu cầu PIN khi thành viên mở link." : "Đội hiện chưa yêu cầu PIN."}
+              </p>
+              <form
+                className="mt-3 flex flex-wrap items-end gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void captainAction("setPin", { pin: nextPin });
+                }}
+              >
+                <div>
+                  <label htmlFor="captain-set-team-pin" className="label">{team.hasPin ? "PIN mới" : "Tạo PIN"}</label>
+                  <input
+                    id="captain-set-team-pin"
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    minLength={6}
+                    maxLength={6}
+                    required
+                    value={nextPin}
+                    onChange={(event) => setNextPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="input mt-2 max-w-44 tracking-[0.4em]"
+                  />
+                </div>
+                <button className="primary" disabled={captainActionBusy || nextPin.length !== 6}>
+                  {team.hasPin ? "Cập nhật PIN" : "Tạo PIN"}
+                </button>
+                {team.hasPin && (
+                  <button type="button" className="secondary" disabled={captainActionBusy} onClick={() => void captainAction("setPin", { pin: null })}>
+                    Tắt PIN
+                  </button>
+                )}
+              </form>
+            </div>
+            <div>
+              <h3 className="font-semibold">Nhượng quyền đội trưởng</h3>
+              <p className="mt-1 text-xs leading-5 text-emerald-100/55">
+                Mã bàn giao chỉ hiện một lần. Gửi riêng mã đó cho thành viên nhận quyền.
+              </p>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <div>
+                  <label htmlFor="new-captain-member" className="label">Đội trưởng mới</label>
+                  <select
+                    id="new-captain-member"
+                    className="input mt-2 min-w-48"
+                    value={captainCodeEntry}
+                    onChange={(event) => setCaptainCodeEntry(event.target.value)}
+                  >
+                    <option value="">Chọn thành viên</option>
+                    {team.members.filter((item) => item.id !== team.captainMemberId).map((item) => (
+                      <option key={item.id} value={item.id}>{memberLabel(item)}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={captainActionBusy || !captainCodeEntry || !team.members.some((item) => item.id === captainCodeEntry)}
+                  onClick={() => {
+                    const memberId = captainCodeEntry;
+                    setCaptainCodeEntry("");
+                    void captainAction("transferCaptain", { memberId });
+                  }}
+                >
+                  Chuyển đội trưởng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {canClaimCaptain && !isCaptain && (
+          <div className="mt-5 rounded-xl border border-amber-300/20 p-4">
+            <p className="text-sm text-amber-100">
+              Đội này được tạo trước khi có chức năng đội trưởng. Thành viên đầu tiên nhận quyền sẽ trở thành đội trưởng.
+            </p>
+            {team.members.length ? (
+              <button className="primary mt-3" disabled={captainActionBusy} onClick={() => void captainAction("claimCaptain", { memberId: team.members[0].id })}>
+                Nhận quyền đội trưởng với tên {memberLabel(team.members[0])}
+              </button>
+            ) : (
+              <p className="mt-3 text-sm text-emerald-100/60">Hãy thêm mình vào đội hình trước để nhận quyền đội trưởng.</p>
+            )}
+          </div>
+        )}
+        {!isCaptain && !canClaimCaptain && !handoverToken && (
+          <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={acceptCaptainToken}>
+            <div>
+              <label htmlFor="captain-handover-code" className="label">Mã nhận quyền đội trưởng</label>
+              <input
+                id="captain-handover-code"
+                autoComplete="off"
+                value={captainCodeEntry}
+                onChange={(event) => setCaptainCodeEntry(event.target.value)}
+                className="input mt-2 min-w-64 font-mono text-xs"
+              />
+            </div>
+            <button className="secondary" disabled={captainActionBusy || !captainCodeEntry.trim()}>
+              Xác nhận nhận quyền
+            </button>
+          </form>
+        )}
+        {handoverToken && !isCaptain && (
+          <div className="mt-5 rounded-xl border border-amber-300/30 bg-amber-300/5 p-4">
+            <p className="text-sm font-semibold text-amber-100">Mã bàn giao đội trưởng — chỉ chia sẻ riêng với người nhận</p>
+            <code className="mt-2 block break-all rounded-lg bg-black/20 p-3 text-xs text-amber-200">{handoverToken}</code>
+            <button type="button" className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(handoverToken)}>Sao chép mã</button>
+          </div>
+        )}
+      </section>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_350px]">
         <div className="min-w-0 space-y-6">
           <section className="panel p-5 sm:p-7">
@@ -621,8 +892,7 @@ export function TeamBoard({ slug }: { slug: string }) {
       </div>
       <DreamTeamSection team={team} busy={busy} onSave={mutate} />
       <p className="mt-7 text-xs leading-5 text-emerald-100/40">
-        Ai có link đều có thể chỉnh sửa. Lịch hết hạn ngày{" "}
-        {new Date(team.expiresAt).toLocaleDateString("vi-VN")}.
+        Ai có link đều có thể sửa lịch và thành viên.
       </p>
     </Shell>
   );
