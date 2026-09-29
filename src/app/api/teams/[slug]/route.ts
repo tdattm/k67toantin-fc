@@ -3,10 +3,7 @@ import { body, failure, reply, validName } from "@/lib/api";
 import { ApiError, getTeam, updateTeam } from "@/lib/store";
 import { updateAccountTeam, deleteAccountTeam } from "@/lib/account-store";
 import {
-  hashCaptainToken,
   hashTeamPin,
-  isCaptainTokenValid,
-  newCaptainToken,
   verifyTeamPin,
 } from "@/lib/team-security";
 import {
@@ -29,7 +26,7 @@ function pinAccess(request: Request, team: Awaited<ReturnType<typeof getTeam>>) 
   try {
     allowed = verifyTeamPin(request.headers.get("x-team-pin"), team.accessPinHash);
   } catch {
-    throw new ApiError(503, "Mã PIN của đội không hợp lệ. Hãy báo đội trưởng kiểm tra lại.");
+    throw new ApiError(503, "Mã PIN của đội không hợp lệ. Hãy liên hệ người đã chia sẻ link đội.");
   }
   if (!allowed) throw new ApiError(401, "Bạn cần nhập đúng PIN 6 số để vào đội.");
 }
@@ -48,11 +45,7 @@ export async function GET(request: Request, context: Context) {
       return reply({ team: publicTeam(team), isCaptain: team.captainUid === user.uid, memberId: user.uid, canClaimCaptain: false });
     }
     pinAccess(request, team);
-    return reply({
-      team: publicTeam(team),
-      isCaptain: isCaptainTokenValid(team.captainTokenHash, request.headers.get("x-captain-token")),
-      canClaimCaptain: !team.captainTokenHash,
-    });
+    return reply({ team: publicTeam(team) });
   } catch (error) {
     return failure(error);
   }
@@ -63,10 +56,6 @@ export async function PATCH(request: Request, context: Context) {
     const slug = (await context.params).slug;
     const existing = await getTeam(slug);
     const user = existing.kind === "account" ? await accountUser(request) : null;
-    const captainToken = request.headers.get("x-captain-token");
-    let captainTransferToken: string | undefined;
-    if (!user && (data.action === "transferCaptain" || data.action === "claimCaptain"))
-      captainTransferToken = newCaptainToken();
     const edit = (team: Awaited<ReturnType<typeof getTeam>>) => {
       if (user) {
         if (team.kind !== "account") throw new ApiError(409, "Chế độ đội đã thay đổi.");
@@ -78,6 +67,7 @@ export async function PATCH(request: Request, context: Context) {
         if (data.action === "leave" && data.memberId !== user.uid)
           throw new ApiError(403, "Chỉ được rời đội bằng tài khoản của mình.");
         if (["add", "claimCaptain"].includes(data.action)) throw new ApiError(403, "Thành viên đội mới phải tự tham gia bằng tài khoản.");
+        if (data.action === "resetAvailability") throw new ApiError(403, "Đội tài khoản không dùng thao tác đặt lại lịch legacy.");
       } else {
         if (team.kind === "account") throw new ApiError(403, "Đội tài khoản cần xác thực Firebase.");
         pinAccess(request, team);
@@ -89,8 +79,6 @@ export async function PATCH(request: Request, context: Context) {
           else team.joinPinHash = hashTeamPin(data.pin);
           return;
         }
-        if (!isCaptainTokenValid(team.captainTokenHash, captainToken))
-          throw new ApiError(403, "Chỉ đội trưởng mới được tạo hoặc sửa PIN của đội.");
         if (data.pin === null || data.pin === "") delete team.accessPinHash;
         else if (typeof data.pin !== "string" || !/^\d{6}$/.test(data.pin))
           throw new ApiError(400, "PIN đội phải gồm đúng 6 chữ số.");
@@ -104,13 +92,12 @@ export async function PATCH(request: Request, context: Context) {
           team.captainMemberId = target.id;
           return;
         }
-        const claiming = data.action === "claimCaptain";
-        if (claiming ? team.captainTokenHash : !isCaptainTokenValid(team.captainTokenHash, captainToken))
-          throw new ApiError(403, claiming ? "Đội đã có đội trưởng." : "Chỉ đội trưởng mới được nhượng quyền.");
-        if (typeof data.memberId !== "string" || !team.members.some((member) => member.id === data.memberId))
-          throw new ApiError(404, "Thành viên nhận quyền không còn trong đội.");
-        team.captainMemberId = data.memberId;
-        team.captainTokenHash = hashCaptainToken(captainTransferToken!);
+        throw new ApiError(403, "Đội legacy không có quyền đội trưởng.");
+      } else if (data.action === "resetAvailability") {
+        for (const member of team.members) {
+          member.slots = [];
+          member.updatedAt = null;
+        }
       } else if (data.action === "add") {
         const name = validName(data.name);
         const nameWordCount = name.split(/\s+/).length;
@@ -219,7 +206,7 @@ export async function PATCH(request: Request, context: Context) {
         const member = team.members.find((m) => m.id === data.memberId);
         if (!member) throw new ApiError(404, "Thành viên không còn trong đội.");
         if (data.action === "remove" || data.action === "leave") {
-          if (data.memberId === team.captainMemberId)
+          if (user && data.memberId === team.captainMemberId)
             throw new ApiError(409, "Hãy nhượng quyền đội trưởng trước khi xóa thành viên này.");
           team.members = team.members.filter((m) => m.id !== data.memberId);
           for (const remaining of team.members) {
@@ -263,11 +250,7 @@ export async function PATCH(request: Request, context: Context) {
     const team = user ? await updateAccountTeam(slug, edit) : await updateTeam(slug, edit);
     return reply({
       team: publicTeam(team),
-      isCaptain: user ? team.captainUid === user.uid :
-        data.action === "claimCaptain" ||
-        isCaptainTokenValid(team.captainTokenHash, captainToken),
-      ...(user ? { memberId: user.uid } : {}),
-      ...(captainTransferToken ? { captainTransferToken } : {}),
+      ...(user ? { isCaptain: team.captainUid === user.uid, memberId: user.uid } : {}),
     });
   } catch (error) {
     return failure(error);

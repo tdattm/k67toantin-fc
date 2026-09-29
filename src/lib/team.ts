@@ -20,6 +20,7 @@ export type Team = {
   expiresAt: number;
   members: Member[];
   captainMemberId?: string;
+  /** Historical legacy field; ignored and removed when a legacy team is loaded. */
   captainTokenHash?: string;
   accessPinHash?: string;
   hasPin?: boolean;

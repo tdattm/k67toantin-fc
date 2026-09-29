@@ -19,13 +19,8 @@ export function TeamBoard({ slug }: { slug: string }) {
   const [pinEntry, setPinEntry] = useState("");
   const [pinRequired, setPinRequired] = useState(false);
   const [credentialsReady, setCredentialsReady] = useState(false);
-  const [captainToken, setCaptainToken] = useState("");
-  const [isCaptain, setIsCaptain] = useState(false);
-  const [canClaimCaptain, setCanClaimCaptain] = useState(false);
-  const [captainCodeEntry, setCaptainCodeEntry] = useState("");
-  const [handoverToken, setHandoverToken] = useState("");
   const [nextPin, setNextPin] = useState("");
-  const [captainActionBusy, setCaptainActionBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [selected, setSelected] = useState("");
   const [draft, setDraft] = useState<number[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -42,18 +37,17 @@ export function TeamBoard({ slug }: { slug: string }) {
   const mutating = useRef(false);
   useEffect(() => {
     setTeamPin(sessionStorage.getItem(`team-pin:${slug}`) || "");
-    setCaptainToken(localStorage.getItem(`team-captain:${slug}`) || "");
+    localStorage.removeItem(`team-captain:${slug}`);
     setCredentialsReady(true);
   }, [slug]);
   const request = useCallback(
-    async (body?: object): Promise<{ team: Team; storageMode: string; isCaptain: boolean; canClaimCaptain: boolean; captainTransferToken?: string }> => {
+    async (body?: object): Promise<{ team: Team; storageMode: string }> => {
       const response = await fetch(`/api/teams/${slug}`, {
         method: body ? "PATCH" : "GET",
         cache: "no-store",
         headers: {
           "Content-Type": "application/json",
           ...(teamPin ? { "X-Team-Pin": teamPin } : {}),
-          ...(captainToken ? { "X-Captain-Token": captainToken } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(15000),
@@ -66,7 +60,7 @@ export function TeamBoard({ slug }: { slug: string }) {
       if (!response.ok) throw new Error(data.error || "Không thể kết nối.");
       return data;
     },
-    [slug, teamPin, captainToken],
+    [slug, teamPin],
   );
   const refresh = useCallback(async () => {
     if (mutating.current) return;
@@ -76,8 +70,6 @@ export function TeamBoard({ slug }: { slug: string }) {
       if (current === version.current) {
         setTeam(data.team);
         setMode(data.storageMode);
-        setIsCaptain(data.isCaptain === true);
-        setCanClaimCaptain(data.canClaimCaptain === true);
         setError("");
       }
     } catch (error) {
@@ -195,8 +187,6 @@ export function TeamBoard({ slug }: { slug: string }) {
       setTeamPin(pinEntry);
       setTeam(data.team);
       setMode(data.storageMode);
-      setIsCaptain(data.isCaptain === true);
-      setCanClaimCaptain(data.canClaimCaptain === true);
       setPinRequired(false);
       setError("");
     } catch (error) {
@@ -206,72 +196,19 @@ export function TeamBoard({ slug }: { slug: string }) {
       setLoaded(true);
     }
   }
-  async function captainAction(action: "setPin" | "transferCaptain" | "claimCaptain", values: Record<string, unknown> = {}) {
-    setCaptainActionBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const data = await request({ action, ...values });
-      setTeam(data.team);
-      setCanClaimCaptain(data.canClaimCaptain === true);
-      if (data.captainTransferToken) {
-        setHandoverToken(data.captainTransferToken);
-        if (action === "claimCaptain") {
-          localStorage.setItem(`team-captain:${slug}`, data.captainTransferToken);
-          setCaptainToken(data.captainTransferToken);
-          setIsCaptain(true);
-          setCanClaimCaptain(false);
-          setNotice("Bạn đã nhận quyền đội trưởng. Hãy giữ mã quản trị an toàn.");
-        } else {
-          localStorage.removeItem(`team-captain:${slug}`);
-          setCaptainToken("");
-          setIsCaptain(false);
-          setNotice("Đã chuyển quyền. Gửi mã bàn giao cho đội trưởng mới để họ lưu lại.");
-        }
-      } else {
-        setIsCaptain(data.isCaptain === true);
-        if (action === "setPin") {
-          const updatedPin = typeof values.pin === "string" ? values.pin : "";
-          if (updatedPin) sessionStorage.setItem(`team-pin:${slug}`, updatedPin);
-          else sessionStorage.removeItem(`team-pin:${slug}`);
-          setTeamPin(updatedPin);
-          setNextPin("");
-          setNotice(updatedPin ? "Đã cập nhật PIN của đội." : "Đã tắt PIN của đội.");
-        }
-      }
-    } catch (error) {
-      setError(userFacingError(error, "Không thể cập nhật quyền đội trưởng. Hãy thử lại."));
-    } finally {
-      setCaptainActionBusy(false);
+  async function setAccessPin(pin: string | null) {
+    if (await mutate({ action: "setPin", pin }, pin ? "Đã cập nhật PIN của đội." : "Đã tắt PIN của đội.")) {
+      if (pin) sessionStorage.setItem(`team-pin:${slug}`, pin);
+      else sessionStorage.removeItem(`team-pin:${slug}`);
+      setTeamPin(pin || "");
+      setNextPin("");
     }
   }
-  async function acceptCaptainToken(event: FormEvent) {
-    event.preventDefault();
-    setCaptainActionBusy(true);
-    setError("");
-    try {
-      const response = await fetch(`/api/teams/${slug}`, {
-        cache: "no-store",
-        headers: {
-          ...(teamPin ? { "X-Team-Pin": teamPin } : {}),
-          "X-Captain-Token": captainCodeEntry.trim(),
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-      const data = await response.json();
-      if (!response.ok || data.isCaptain !== true)
-        throw new Error(data.error || "Mã bàn giao không hợp lệ.");
-      localStorage.setItem(`team-captain:${slug}`, captainCodeEntry.trim());
-      setCaptainToken(captainCodeEntry.trim());
-      setCaptainCodeEntry("");
-      setTeam(data.team);
-      setIsCaptain(true);
-      setCanClaimCaptain(false);
-      setNotice("Đã nhận quyền đội trưởng.");
-    } catch (error) {
-      setError(userFacingError(error, "Mã bàn giao không hợp lệ. Hãy kiểm tra lại."));
-    } finally {
-      setCaptainActionBusy(false);
+  async function resetAvailability() {
+    if (await mutate({ action: "resetAvailability" }, "Đã đặt lại giờ rảnh của toàn đội.")) {
+      setDirty(false);
+      setDraft([]);
+      setConfirmReset(false);
     }
   }
   if (!team)
@@ -383,131 +320,56 @@ export function TeamBoard({ slug }: { slug: string }) {
         </p>
       )}
       <section className="panel mb-6 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="eyebrow">QUẢN LÝ ĐỘI</p>
+        <h2 className="mt-2 text-xl font-bold">Cùng quản lý lịch đội</h2>
+        <p className="mt-2 text-sm text-emerald-100/65">
+          Ai mở được link đội và nhập đúng PIN nếu đội yêu cầu đều có thể quản lý lịch và thành viên.
+        </p>
+        <div className="mt-5 grid gap-6 lg:grid-cols-2">
           <div>
-            <p className="eyebrow">QUẢN LÝ ĐỘI</p>
-            <h2 className="mt-2 text-xl font-bold">Đội trưởng</h2>
-            <p className="mt-2 text-sm text-emerald-100/65">
-              {team.captainMemberId
-                ? team.members.find((item) => item.id === team.captainMemberId)?.name || "Đội trưởng hiện tại"
-                : "Chưa có đội trưởng"}
-              {isCaptain && <span className="ml-2 text-amber-300">· Bạn đang giữ quyền đội trưởng</span>}
+            <h3 className="font-semibold">PIN bảo vệ đội</h3>
+            <p className="mt-1 text-xs leading-5 text-emerald-100/55">
+              {team.hasPin ? "Đội đang yêu cầu PIN khi mở link." : "Đội hiện chưa yêu cầu PIN."}
             </p>
-          </div>
-        </div>
-        {isCaptain && (
-          <div className="mt-5 grid gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="font-semibold">PIN bảo vệ đội</h3>
-              <p className="mt-1 text-xs leading-5 text-emerald-100/55">
-                {team.hasPin ? "Đội đang yêu cầu PIN khi thành viên mở link." : "Đội hiện chưa yêu cầu PIN."}
-              </p>
-              <form
-                className="mt-3 flex flex-wrap items-end gap-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void captainAction("setPin", { pin: nextPin });
-                }}
-              >
-                <div>
-                  <label htmlFor="captain-set-team-pin" className="label">{team.hasPin ? "PIN mới" : "Tạo PIN"}</label>
-                  <input
-                    id="captain-set-team-pin"
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
-                    minLength={6}
-                    maxLength={6}
-                    required
-                    value={nextPin}
-                    onChange={(event) => setNextPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="input mt-2 max-w-44 tracking-[0.4em]"
-                  />
-                </div>
-                <button className="primary" disabled={captainActionBusy || nextPin.length !== 6}>
-                  {team.hasPin ? "Cập nhật PIN" : "Tạo PIN"}
-                </button>
-                {team.hasPin && (
-                  <button type="button" className="secondary" disabled={captainActionBusy} onClick={() => void captainAction("setPin", { pin: null })}>
-                    Tắt PIN
-                  </button>
-                )}
-              </form>
-            </div>
-            <div>
-              <h3 className="font-semibold">Nhượng quyền đội trưởng</h3>
-              <p className="mt-1 text-xs leading-5 text-emerald-100/55">
-                Mã bàn giao chỉ hiện một lần. Gửi riêng mã đó cho thành viên nhận quyền.
-              </p>
-              <div className="mt-3 flex flex-wrap items-end gap-3">
-                <div>
-                  <label htmlFor="new-captain-member" className="label">Đội trưởng mới</label>
-                  <select
-                    id="new-captain-member"
-                    className="input mt-2 min-w-48"
-                    value={captainCodeEntry}
-                    onChange={(event) => setCaptainCodeEntry(event.target.value)}
-                  >
-                    <option value="">Chọn thành viên</option>
-                    {team.members.filter((item) => item.id !== team.captainMemberId).map((item) => (
-                      <option key={item.id} value={item.id}>{memberLabel(item)}</option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={captainActionBusy || !captainCodeEntry || !team.members.some((item) => item.id === captainCodeEntry)}
-                  onClick={() => {
-                    const memberId = captainCodeEntry;
-                    setCaptainCodeEntry("");
-                    void captainAction("transferCaptain", { memberId });
-                  }}
-                >
-                  Chuyển đội trưởng
-                </button>
+            <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={(event) => {
+              event.preventDefault();
+              void setAccessPin(nextPin);
+            }}>
+              <div>
+                <label htmlFor="legacy-set-team-pin" className="label">{team.hasPin ? "PIN mới" : "Tạo PIN"}</label>
+                <input id="legacy-set-team-pin" type="password" inputMode="numeric" pattern="[0-9]{6}"
+                  minLength={6} maxLength={6} required value={nextPin}
+                  onChange={(event) => setNextPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="input mt-2 max-w-44 tracking-[0.4em]" />
               </div>
-            </div>
-          </div>
-        )}
-        {canClaimCaptain && !isCaptain && (
-          <div className="mt-5 rounded-xl border border-amber-300/20 p-4">
-            <p className="text-sm text-amber-100">
-              Đội này được tạo trước khi có chức năng đội trưởng. Thành viên đầu tiên nhận quyền sẽ trở thành đội trưởng.
-            </p>
-            {team.members.length ? (
-              <button className="primary mt-3" disabled={captainActionBusy} onClick={() => void captainAction("claimCaptain", { memberId: team.members[0].id })}>
-                Nhận quyền đội trưởng với tên {memberLabel(team.members[0])}
+              <button className="primary" disabled={busy || nextPin.length !== 6}>
+                {team.hasPin ? "Cập nhật PIN" : "Tạo PIN"}
               </button>
+              {team.hasPin && <button type="button" className="secondary" disabled={busy}
+                onClick={() => void setAccessPin(null)}>Tắt PIN</button>}
+            </form>
+          </div>
+          <div>
+            <h3 className="font-semibold">Bắt đầu chọn giờ lại</h3>
+            <p className="mt-1 text-xs leading-5 text-emerald-100/55">
+              Đặt lại lịch rảnh cho toàn đội khi cần lên lịch cho tuần mới.
+            </p>
+            {!confirmReset ? (
+              <button type="button" className="secondary mt-3" disabled={busy}
+                onClick={() => setConfirmReset(true)}>Đặt lại toàn bộ giờ rảnh</button>
             ) : (
-              <p className="mt-3 text-sm text-emerald-100/60">Hãy thêm mình vào đội hình trước để nhận quyền đội trưởng.</p>
+              <div role="group" aria-label="Xác nhận đặt lại giờ rảnh" className="mt-3 rounded-xl border border-amber-300/30 p-4">
+                <p className="text-sm text-amber-100">Lịch rảnh của tất cả thành viên sẽ bị xóa. Mọi người cần chọn giờ lại.</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button type="button" className="secondary text-amber-100" disabled={busy}
+                    onClick={() => void resetAvailability()}>{busy ? "Đang đặt lại…" : "Xác nhận đặt lại"}</button>
+                  <button type="button" className="secondary" disabled={busy}
+                    onClick={() => setConfirmReset(false)}>Hủy</button>
+                </div>
+              </div>
             )}
           </div>
-        )}
-        {!isCaptain && !canClaimCaptain && !handoverToken && (
-          <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={acceptCaptainToken}>
-            <div>
-              <label htmlFor="captain-handover-code" className="label">Mã nhận quyền đội trưởng</label>
-              <input
-                id="captain-handover-code"
-                autoComplete="off"
-                value={captainCodeEntry}
-                onChange={(event) => setCaptainCodeEntry(event.target.value)}
-                className="input mt-2 min-w-64 font-mono text-xs"
-              />
-            </div>
-            <button className="secondary" disabled={captainActionBusy || !captainCodeEntry.trim()}>
-              Xác nhận nhận quyền
-            </button>
-          </form>
-        )}
-        {handoverToken && !isCaptain && (
-          <div className="mt-5 rounded-xl border border-amber-300/30 bg-amber-300/5 p-4">
-            <p className="text-sm font-semibold text-amber-100">Mã bàn giao đội trưởng — chỉ chia sẻ riêng với người nhận</p>
-            <code className="mt-2 block break-all rounded-lg bg-black/20 p-3 text-xs text-amber-200">{handoverToken}</code>
-            <button type="button" className="secondary mt-3" onClick={() => void navigator.clipboard.writeText(handoverToken)}>Sao chép mã</button>
-          </div>
-        )}
+        </div>
       </section>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_350px]">
         <div className="min-w-0 space-y-6">
