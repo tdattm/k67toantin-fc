@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/pro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Team, TeamSummary } from "./team";
-import { hashCaptainToken, hashTeamPin, newCaptainToken } from "./team-security";
+import { hashTeamPin } from "./team-security";
 
 export class ApiError extends Error {
   constructor(
@@ -62,6 +62,11 @@ function decode(raw: string | null): Team {
       "Đội không tồn tại hoặc dữ liệu đã hết hạn. Hãy tạo đội mới.",
     );
   const team: Team = JSON.parse(raw);
+  if (team.kind !== "account") {
+    delete team.captainMemberId;
+    delete team.captainTokenHash;
+    delete team.captainUid;
+  }
   if (!team.createdAt) {
     team.createdAt = team.expiresAt - legacyTtl * 1000;
     team.expiresAt = team.createdAt + ttl * 1000;
@@ -73,10 +78,15 @@ function decode(raw: string | null): Team {
     );
   return team;
 }
+function needsLegacyUpgrade(raw: string) {
+  const previous: Team = JSON.parse(raw);
+  return !previous.createdAt || (previous.kind !== "account" &&
+    (previous.captainMemberId !== undefined || previous.captainTokenHash !== undefined || previous.captainUid !== undefined));
+}
 export async function getTeam(slug: string) {
   const raw = await rawRead(slug);
   const team = decode(raw);
-  if (raw && !JSON.parse(raw).createdAt) await persistLegacyTeam(slug, raw, team);
+  if (raw && needsLegacyUpgrade(raw)) await persistLegacyTeam(slug, raw, team);
   return team;
 }
 export async function listTeams(): Promise<TeamSummary[]> {
@@ -88,7 +98,7 @@ export async function listTeams(): Promise<TeamSummary[]> {
   async function collect(slug: string, raw: string | null) {
     try {
       const team = decode(raw);
-      if (raw && !JSON.parse(raw).createdAt)
+      if (raw && needsLegacyUpgrade(raw))
         await persistLegacyTeam(slug, raw, team);
       teams.push({
         slug: team.slug,
@@ -233,22 +243,19 @@ async function persistLegacyTeam(slug: string, previous: string, team: Team) {
   }
 }
 
-export async function createTeam(name: string, captainName: string, pin?: string) {
+export async function createTeam(name: string, firstMemberName: string, pin?: string) {
   if (storageMode !== "redis" && process.env.NODE_ENV === "production")
     throw new ApiError(503, "Production cần cấu hình Redis bền vững.");
   const createdAt = Date.now();
-  const captainToken = newCaptainToken();
-  const captainMemberId = randomUUID();
+  const firstMemberId = randomUUID();
   const team: Team = {
     slug: randomUUID().replaceAll("-", "").slice(0, 12),
     kind: "legacy",
     name,
     createdAt,
     expiresAt: createdAt + ttl * 1000,
-    captainMemberId,
-    captainTokenHash: hashCaptainToken(captainToken),
     ...(pin ? { accessPinHash: hashTeamPin(pin) } : {}),
-    members: [{ id: captainMemberId, name: captainName, slots: [], updatedAt: null }],
+    members: [{ id: firstMemberId, name: firstMemberName, slots: [], updatedAt: null }],
   };
   if (Boolean(url) !== Boolean(token))
     throw new Error("Incomplete Redis configuration");
@@ -261,9 +268,9 @@ export async function createTeam(name: string, captainName: string, pin?: string
       ttl,
       "NX",
     ]);
-    if (!result) return createTeam(name, captainName, pin);
+    if (!result) return createTeam(name, firstMemberName, pin);
   } else await fileWrite(team);
-  return { team, captainToken };
+  return { team };
 }
 const globalStore = globalThis as typeof globalThis & {
   footballQueue?: Promise<unknown>;
@@ -278,7 +285,7 @@ export async function updateTeam(
       const previous = await rawRead(slug);
       const team = decode(previous);
       if (team.kind === "account") throw new ApiError(403, "Đội tài khoản cần xác thực Firebase.");
-      if (previous && !JSON.parse(previous).createdAt) {
+      if (previous && needsLegacyUpgrade(previous)) {
         await persistLegacyTeam(slug, previous, team);
         continue;
       }

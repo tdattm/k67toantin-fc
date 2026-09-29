@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import test from "node:test";
 
@@ -95,8 +96,8 @@ const { DELETE: deleteLegacy } = await import("../src/app/api/legacy/teams/route
 const { deleteTeams, getTeam } = await import("../src/lib/store");
 const { hashTeamPin } = await import("../src/lib/team-security");
 const { demoTeam } = await import("../src/lib/demo");
-function request(url: string, uid?: string, method = "GET", body?: object) {
-  return new Request(`http://localhost${url}`, { method, headers: { "Content-Type": "application/json", ...(uid ? auth(uid) : {}) }, body: body ? JSON.stringify(body) : undefined });
+function request(url: string, uid?: string, method = "GET", body?: object, headers: Record<string, string> = {}) {
+  return new Request(`http://localhost${url}`, { method, headers: { "Content-Type": "application/json", ...(uid ? auth(uid) : {}), ...headers }, body: body ? JSON.stringify(body) : undefined });
 }
 
 test("demo fixture is isolated and has exactly 19 unique shirts", () => {
@@ -124,6 +125,8 @@ test("verified membership, captain transfer, atomic shirt choice, and legacy bou
   assert.equal((await patch(request(`/api/teams/${slug}`, winner, "PATCH", { action:"dreamTeam", memberId:"alice", formation:"3-1-2", players:{} }),context(slug))).status,403);
   assert.equal((await patch(request(`/api/teams/${slug}`, "alice", "PATCH", { action:"remove", memberId:"alice" }),context(slug))).status,409);
   assert.equal((await patch(request(`/api/teams/${slug}`, winner, "PATCH", { action:"availability", memberId:winner, slots:[1,2] }),context(slug))).status,200);
+  assert.equal((await patch(request(`/api/teams/${slug}`, "alice", "PATCH", { action:"resetAvailability" }),context(slug))).status,403);
+  assert.deepEqual((await getTeam(slug)).members.find(m=>m.id===winner)?.slots,[1,2]);
   assert.equal((await patch(request(`/api/teams/${slug}`, winner, "PATCH", { action:"dreamTeam", memberId:winner, formation:"3-1-2", players:{} }),context(slug))).status,200);
   assert.equal((await patch(request(`/api/teams/${slug}`, "alice", "PATCH", { action:"transferCaptain", memberId:winner }),context(slug))).status,200);
   assert.equal((await patch(request(`/api/teams/${slug}`, "alice", "PATCH", { action:"setPin", pin:null }),context(slug))).status,403);
@@ -145,14 +148,18 @@ test("verified membership, captain transfer, atomic shirt choice, and legacy bou
   assert.equal((await deleteTeam(request(`/api/teams/${slug}`, winner, "DELETE"),context(slug))).status,200);
   assert.equal((await list(request("/api/teams", "alice")).then(r=>r.json())).created.length,0);
 });
-test("old team without createdAt upgrades to one year and stays public", async () => {
+test("old team without createdAt upgrades to one year and permits link-only reset", async () => {
   const slug="abc123abc123";
   const now=Date.now();
-  strings.set(`football:${slug}`, { value:JSON.stringify({slug,name:"Đội Cũ",expiresAt:now+28*86400000,members:[]}), expiresAt:now+28*86400000 });
+  strings.set(`football:${slug}`, { value:JSON.stringify({slug,name:"Đội Cũ",expiresAt:now+28*86400000,members:[
+    {id:"one",name:"Nguyễn Văn A",jerseyNumber:4,slots:[1],updatedAt:"2026-09-01T00:00:00.000Z"}
+  ]}), expiresAt:now+28*86400000 });
   const response=await get(request(`/api/teams/${slug}`),context(slug));
   assert.equal(response.status,200);
   const team=await getTeam(slug);
   assert.ok(team.expiresAt-now>360*86400000);
+  assert.equal((await patch(request(`/api/teams/${slug}`,undefined,"PATCH",{action:"resetAvailability"}),context(slug))).status,200);
+  assert.deepEqual((await getTeam(slug)).members[0],{id:"one",name:"Nguyễn Văn A",jerseyNumber:4,slots:[],updatedAt:null});
 });
 test("legacy access PIN and account join PIN are separate", async () => {
   const slug="def456def456";
@@ -162,6 +169,56 @@ test("legacy access PIN and account join PIN are separate", async () => {
   const accessRequest=new Request(`http://localhost/api/teams/${slug}`,{headers:{"X-Team-Pin":"654321"}});
   assert.equal((await get(accessRequest,context(slug))).status,200);
   assert.equal((await join(request(`/api/teams/${slug}/join`,"bob","POST",{jerseyNumber:9,pin:"654321"}),context(slug))).status,404);
+});
+
+test("legacy reset requires link/PIN access, ignores old captain token, and preserves other data", async () => {
+  const slug="fedcba987654";
+  const now=Date.now();
+  const oldToken="old-captain-secret";
+  const original={kind:"legacy",slug,name:"Đội Legacy",createdAt:now,expiresAt:now+365*86400000,
+    captainMemberId:"first",captainTokenHash:createHash("sha256").update(oldToken).digest("hex"),
+    accessPinHash:hashTeamPin("654321"),members:[
+      {id:"first",name:"Nguyễn Văn A",jerseyNumber:7,slots:[1,3],updatedAt:"2026-09-01T00:00:00.000Z",
+        dreamTeam:{formation:"3-1-2",players:{},support:{},updatedAt:"2026-09-01T00:00:00.000Z"}},
+      {id:"second",name:"Trần Văn B",jerseyNumber:9,slots:[2],updatedAt:"2026-09-02T00:00:00.000Z"}
+    ]};
+  strings.set(`football:${slug}`,{value:JSON.stringify(original),expiresAt:original.expiresAt});
+  const url=`/api/teams/${slug}`;
+  const oldHeader={"X-Captain-Token":oldToken};
+  const pinHeader={"X-Team-Pin":"654321"};
+  assert.equal((await get(request(url,undefined,"GET",undefined,oldHeader),context(slug))).status,401);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"resetAvailability"},oldHeader),context(slug))).status,401);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"setPin",pin:null},oldHeader),context(slug))).status,401);
+  const access=await get(request(url,undefined,"GET",undefined,{...oldHeader,...pinHeader}),context(slug));
+  assert.equal(access.status,200);
+  const accessData=await access.json();
+  assert.equal(accessData.isCaptain,undefined);
+  assert.equal(accessData.canClaimCaptain,undefined);
+  assert.equal(accessData.team.captainMemberId,undefined);
+  assert.equal(accessData.team.captainTokenHash,undefined);
+  assert.equal(accessData.team.hasPin,true);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"claimCaptain",memberId:"second"},{...oldHeader,...pinHeader}),context(slug))).status,403);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"transferCaptain",memberId:"second"},{...oldHeader,...pinHeader}),context(slug))).status,403);
+  const before=await getTeam(slug);
+  const reset=await patch(request(url,undefined,"PATCH",{action:"resetAvailability"},pinHeader),context(slug));
+  assert.equal(reset.status,200);
+  const after=await getTeam(slug);
+  assert.deepEqual(after.members.map(m=>({slots:m.slots,updatedAt:m.updatedAt})),[
+    {slots:[],updatedAt:null},{slots:[],updatedAt:null}
+  ]);
+  assert.deepEqual(after.members.map(({slots: _slots,updatedAt: _updatedAt,...rest})=>rest),
+    before.members.map(({slots: _slots,updatedAt: _updatedAt,...rest})=>rest));
+  assert.equal(after.accessPinHash,before.accessPinHash);
+  assert.equal(after.slug,before.slug);
+  assert.equal(after.expiresAt,before.expiresAt);
+  assert.equal(JSON.parse(read(`football:${slug}`)!).captainTokenHash,undefined);
+  assert.equal((await get(request(url),context(slug))).status,401);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"setPin",pin:"123456"},pinHeader),context(slug))).status,200);
+  assert.equal((await get(request(url,undefined,"GET",undefined,{"X-Team-Pin":"123456"}),context(slug))).status,200);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"remove",memberId:"first"},{"X-Team-Pin":"123456"}),context(slug))).status,200);
+  assert.deepEqual((await getTeam(slug)).members.map(m=>m.id),["second"]);
+  assert.equal((await patch(request(url,undefined,"PATCH",{action:"add",name:"Lê Văn C",jerseyNumber:7}, {"X-Team-Pin":"123456"}),context(slug))).status,200);
+  assert.equal((await getTeam(slug)).members.length,2);
 });
 
 test.after(async () => {

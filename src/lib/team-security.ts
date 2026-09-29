@@ -1,5 +1,4 @@
 import {
-  createHash,
   pbkdf2Sync,
   randomBytes,
   timingSafeEqual,
@@ -7,21 +6,6 @@ import {
 
 const iterations = 310_000;
 const keyLength = 32;
-
-export function newCaptainToken() {
-  return randomBytes(32).toString("base64url");
-}
-
-export function hashCaptainToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-export function isCaptainTokenValid(teamHash: string | undefined, token: string | null) {
-  if (!teamHash || !token) return false;
-  const expected = Buffer.from(teamHash, "hex");
-  const actual = Buffer.from(hashCaptainToken(token), "hex");
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
 
 export function hashTeamPin(pin: string) {
   const salt = randomBytes(16);
